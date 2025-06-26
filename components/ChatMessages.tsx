@@ -5,6 +5,7 @@ import {
     Text,
     View
 } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 
 export interface Message {
   id: string;
@@ -54,14 +55,100 @@ export default function ChatMessages({
           {!message.isUser && (
             <Text style={styles.senderName}>{message.senderName}</Text>
           )}
-          <Text
-            style={[
-              styles.messageText,
-              message.isUser ? styles.userMessageText : styles.assistantMessageText,
-            ]}
-          >
-            {message.text}
-          </Text>
+          
+          {message.isUser ? (
+            <Text
+              style={[
+                styles.messageText,
+                styles.userMessageText,
+              ]}
+            >
+              {message.text}
+            </Text>
+          ) : (
+            <Markdown
+              style={{
+                body: {
+                  color: '#000000',
+                  fontSize: 16,
+                  lineHeight: 20,
+                  margin: 0,
+                },
+                paragraph: {
+                  marginTop: 0,
+                  marginBottom: 8,
+                  flexWrap: 'wrap',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  justifyContent: 'flex-start',
+                },
+                strong: {
+                  fontWeight: 'bold',
+                },
+                em: {
+                  fontStyle: 'italic',
+                },
+                code_inline: {
+                  backgroundColor: '#f0f0f0',
+                  padding: 2,
+                  borderRadius: 3,
+                  fontFamily: 'Courier',
+                  fontSize: 14,
+                },
+                code_block: {
+                  backgroundColor: '#f8f8f8',
+                  padding: 10,
+                  borderRadius: 5,
+                  fontFamily: 'Courier',
+                  fontSize: 14,
+                  marginVertical: 8,
+                },
+                blockquote: {
+                  backgroundColor: '#f9f9f9',
+                  borderLeftWidth: 4,
+                  borderLeftColor: '#ddd',
+                  paddingLeft: 10,
+                  marginVertical: 8,
+                },
+                list_item: {
+                  marginVertical: 2,
+                },
+                bullet_list: {
+                  marginVertical: 8,
+                },
+                ordered_list: {
+                  marginVertical: 8,
+                },
+                heading1: {
+                  fontSize: 20,
+                  fontWeight: 'bold',
+                  marginVertical: 8,
+                },
+                heading2: {
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  marginVertical: 6,
+                },
+                heading3: {
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  marginVertical: 4,
+                },
+                link: {
+                  color: '#007AFF',
+                  textDecorationLine: 'underline',
+                },
+                hr: {
+                  backgroundColor: '#ddd',
+                  height: 1,
+                  marginVertical: 10,
+                },
+              }}
+            >
+              {message.text}
+            </Markdown>
+          )}
+          
           <Text
             style={[
               styles.timestamp,
