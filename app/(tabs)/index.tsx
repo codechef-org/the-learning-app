@@ -1,10 +1,11 @@
+import ChatHistory from '@/components/ChatHistory';
 import ChatScreen from '@/components/ChatScreen';
 import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useAuth } from '@/context/AuthContext';
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button } from 'react-native-paper';
 
 interface LearningMethod {
@@ -20,6 +21,23 @@ interface ChatSession {
   id: string;
   learning_method: LearningMethod;
   topic: string;
+}
+
+interface Chat {
+  id: string;
+  title: string;
+  topic: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  learning_method: {
+    id: string;
+    name: string;
+    description: string;
+    system_prompt: string;
+    icon: string;
+    color: string;
+  };
 }
 
 export default function LearnScreen() {
@@ -47,6 +65,17 @@ export default function LearnScreen() {
       id: chatId,
       learning_method: method,
       topic: topic,
+    });
+    setShowStartScreen(false);
+    setShowLearningMethods(false);
+  };
+
+  const handleChatSelect = (chat: Chat) => {
+    // Resume an existing chat from history
+    setCurrentSession({
+      id: chat.id,
+      learning_method: chat.learning_method,
+      topic: chat.topic,
     });
     setShowStartScreen(false);
     setShowLearningMethods(false);
@@ -163,24 +192,32 @@ export default function LearnScreen() {
           </Button>
         </View>
         
-        <ThemedView style={styles.startLearningContainer}>
-          <ThemedText type="title" style={styles.welcomeTitle}>
-            AI Learning Assistant
-          </ThemedText>
-          <ThemedText style={styles.welcomeSubtitle}>
-            Ready to start your learning journey? Get personalized AI tutoring on any topic you would like to explore.
-          </ThemedText>
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <ThemedView style={styles.startLearningContainer}>
+            <ThemedText type="title" style={styles.welcomeTitle}>
+              AI Learning Assistant
+            </ThemedText>
+            <ThemedText style={styles.welcomeSubtitle}>
+              Ready to start your learning journey? Get personalized AI tutoring on any topic you would like to explore.
+            </ThemedText>
+            
+            <Button
+              mode="contained"
+              onPress={handleStartLearning}
+              style={styles.startLearningButton}
+              contentStyle={styles.startLearningButtonContent}
+              icon="school"
+            >
+              Start Learning
+            </Button>
+          </ThemedView>
           
-          <Button
-            mode="contained"
-            onPress={handleStartLearning}
-            style={styles.startLearningButton}
-            contentStyle={styles.startLearningButtonContent}
-            icon="school"
-          >
-            Start Learning
-          </Button>
-        </ThemedView>
+          <ChatHistory onChatSelect={handleChatSelect} />
+        </ScrollView>
       </ThemedView>
     );
   }
@@ -197,6 +234,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   welcomeHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -210,11 +253,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   startLearningContainer: {
-    flex: 1,
     padding: 20,
     paddingTop: 80,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 400,
   },
   welcomeTitle: {
     textAlign: 'center',
