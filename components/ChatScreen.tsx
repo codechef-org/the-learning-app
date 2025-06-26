@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import { Bubble, GiftedChat, IMessage, Send } from 'react-native-gifted-chat';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import ChatInput from './ChatInput';
+import ChatMessages, { Message } from './ChatMessages';
 
 interface ChatScreenProps {
   chatId: string;
@@ -24,16 +25,47 @@ export default function ChatScreen({
   topic,
   onMarkComplete 
 }: ChatScreenProps) {
-  const [messages, setMessages] = useState<IMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const { user } = useAuth();
+  
+  // Ref to track if component is mounted for cleanup
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      // Cancel any ongoing API requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   useEffect(() => {
-    loadChatHistory();
+    if (chatId) {
+      loadChatHistory();
+    }
+    
+    return () => {
+      // Cancel any ongoing requests when chatId changes
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [chatId]);
 
   const loadChatHistory = async () => {
+    if (!isMountedRef.current) return;
+    
+    // Reset all states when loading a new chat
+    setMessages([]);
+    setIsLoading(false);
+    setHasLoadedInitially(false);
+    
     try {
       const { data: messagesData, error } = await supabase
         .from('messages')
@@ -42,30 +74,31 @@ export default function ChatScreen({
         .order('message_order', { ascending: true });
 
       if (error) throw error;
+      
+      if (!isMountedRef.current) return;
 
-      const giftedMessages: IMessage[] = messagesData
-        .map((msg, index) => ({
-          _id: msg.id,
-          text: msg.content,
-          createdAt: new Date(msg.created_at),
-          user: {
-            _id: msg.role === 'user' ? 1 : 2,
-            name: msg.role === 'user' ? 'You' : learningMethodName,
-            avatar: msg.role === 'assistant' ? '🤖' : undefined,
-          },
-        }))
-        .reverse(); // Gifted Chat expects newest messages first
+      const customMessages: Message[] = messagesData.map((msg) => ({
+        id: msg.id,
+        text: msg.content,
+        createdAt: new Date(msg.created_at),
+        isUser: msg.role === 'user',
+        senderName: msg.role === 'user' ? 'You' : learningMethodName,
+      }));
 
-      setMessages(giftedMessages);
+      setMessages(customMessages);
       setHasLoadedInitially(true);
 
       // If this is a new chat (no messages), automatically send the first message
       if (messagesData.length === 0 && topic.trim()) {
         setTimeout(() => {
-          sendInitialMessage();
+          if (isMountedRef.current) {
+            sendInitialMessage();
+          }
         }, 500); // Small delay to ensure UI is ready
       }
     } catch (error) {
+      if (!isMountedRef.current) return;
+      
       console.error('Error loading chat history:', error);
       Alert.alert('Error', 'Failed to load chat history');
       setHasLoadedInitially(true);
@@ -73,22 +106,58 @@ export default function ChatScreen({
   };
 
   const sendInitialMessage = async () => {
+    if (!isMountedRef.current) return;
+    
     const initialMessage = `I want to learn about: ${topic}`;
     
-    const userMessage: IMessage = {
-      _id: Math.random().toString(),
+    const userMessage: Message = {
+      id: Math.random().toString(),
       text: initialMessage,
       createdAt: new Date(),
-      user: {
-        _id: 1,
-        name: 'You',
-      },
+      isUser: true,
+      senderName: 'You',
     };
 
     // Add user message to UI immediately
-    setMessages(previousMessages => GiftedChat.append(previousMessages, [userMessage]));
+    setMessages(prevMessages => [...prevMessages, userMessage]);
     setIsLoading(true);
 
+    try {
+      await sendMessageToAI(initialMessage, []);
+    } catch (error) {
+      if (!isMountedRef.current) return;
+      
+      console.error('Error sending initial message:', error);
+      Alert.alert('Error', 'Failed to start conversation. Please try again.');
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: 'error-message',
+        text: 'Sorry, I had trouble starting our conversation. Please try sending a message to continue.',
+        createdAt: new Date(),
+        isUser: false,
+        senderName: learningMethodName,
+      };
+      
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const sendMessageToAI = async (messageText: string, chatHistory: ChatMessage[]) => {
+    if (!isMountedRef.current) return;
+    
+    // Cancel any previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+    
     try {
       // Call the Supabase Edge Function
       const { data: session } = await supabase.auth.getSession();
@@ -104,12 +173,15 @@ export default function ChatScreen({
           'Authorization': `Bearer ${session.session.access_token}`,
         },
         body: JSON.stringify({
-          message: initialMessage,
+          message: messageText,
           chatId,
           systemPrompt,
-          chatHistory: [],
+          chatHistory,
         }),
+        signal: abortControllerRef.current.signal,
       });
+
+      if (!isMountedRef.current) return;
 
       const result = await response.json();
 
@@ -118,187 +190,89 @@ export default function ChatScreen({
       }
 
       // Add AI response to UI
-      const aiMessage: IMessage = {
-        _id: Math.random().toString(),
+      const aiMessage: Message = {
+        id: Math.random().toString(),
         text: result.response,
         createdAt: new Date(),
-        user: {
-          _id: 2,
-          name: learningMethodName,
-          avatar: '🤖',
-        },
+        isUser: false,
+        senderName: learningMethodName,
       };
 
-      setMessages(previousMessages => GiftedChat.append(previousMessages, [aiMessage]));
-    } catch (error) {
-      console.error('Error sending initial message:', error);
-      Alert.alert('Error', 'Failed to start conversation. Please try again.');
+      if (isMountedRef.current) {
+        setMessages(prevMessages => [...prevMessages, aiMessage]);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Request was cancelled, don't show error
+        return;
+      }
       
-      // Remove the user message that failed to send
-      setMessages(previousMessages => 
-        previousMessages.filter(msg => msg._id !== userMessage._id)
-      );
-    } finally {
-      setIsLoading(false);
+      if (!isMountedRef.current) return;
+      
+      throw error; // Re-throw for caller to handle
     }
   };
 
-  const onSend = useCallback(async (newMessages: IMessage[] = []) => {
-    const userMessage = newMessages[0];
-    if (!userMessage || !userMessage.text || !userMessage.text.trim()) {
-      console.error('Invalid message:', userMessage);
-      return;
-    }
+  const handleSendMessage = useCallback(async (messageText: string) => {
+    if (!isMountedRef.current || !messageText.trim()) return;
 
-    // Validate required fields before sending
+    // Validate required fields
     if (!chatId || !systemPrompt) {
       console.error('Missing required fields:', { chatId, systemPrompt });
       Alert.alert('Error', 'Chat configuration is incomplete. Please try again.');
       return;
     }
 
+    const userMessage: Message = {
+      id: Math.random().toString(),
+      text: messageText.trim(),
+      createdAt: new Date(),
+      isUser: true,
+      senderName: 'You',
+    };
+
     // Add user message to UI immediately
-    setMessages(previousMessages => GiftedChat.append(previousMessages, newMessages));
+    setMessages(prevMessages => [...prevMessages, userMessage]);
     setIsLoading(true);
 
     try {
       // Prepare chat history for AI context
       const chatHistory: ChatMessage[] = messages
-        .slice(0, 10) // Limit to last 10 messages for context
-        .reverse() // Convert back to chronological order
+        .slice(-10) // Limit to last 10 messages for context
         .map(msg => ({
-          role: msg.user._id === 1 ? 'user' : 'assistant',
+          role: msg.isUser ? 'user' : 'assistant',
           content: msg.text,
         }));
 
-      // Call the Supabase Edge Function
-      const { data: session } = await supabase.auth.getSession();
-      
-      if (!session.session?.access_token) {
-        throw new Error('No authentication token available');
-      }
-
-      console.log(chatId);
-      
-      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.session.access_token}`,
-        },
-        body: JSON.stringify({
-          message: userMessage.text.trim(),
-          chatId,
-          systemPrompt,
-          chatHistory,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to get AI response');
-      }
-
-      // Add AI response to UI
-      const aiMessage: IMessage = {
-        _id: Math.random().toString(),
-        text: result.response,
-        createdAt: new Date(),
-        user: {
-          _id: 2,
-          name: learningMethodName,
-          avatar: '🤖',
-        },
-      };
-
-      setMessages(previousMessages => GiftedChat.append(previousMessages, [aiMessage]));
+      await sendMessageToAI(messageText.trim(), chatHistory);
     } catch (error) {
+      if (!isMountedRef.current) return;
+      
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
       
       // Remove the user message that failed to send
-      setMessages(previousMessages => 
-        previousMessages.filter(msg => msg._id !== userMessage._id)
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => msg.id !== userMessage.id)
       );
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [messages, chatId, systemPrompt, learningMethodName]);
 
-  const renderBubble = (props: any) => {
-    return (
-      <Bubble
-        {...props}
-        wrapperStyle={{
-          right: {
-            backgroundColor: '#007AFF',
-          },
-          left: {
-            backgroundColor: '#E5E5EA',
-          },
-        }}
-        textStyle={{
-          right: {
-            color: '#FFFFFF',
-          },
-          left: {
-            color: '#000000',
-          },
-        }}
-      />
-    );
-  };
-
-  const renderSend = (props: any) => {
-    return (
-      <Send
-        {...props}
-        disabled={isLoading}
-        containerStyle={styles.sendContainer}
-      >
-        <View style={[
-          styles.sendButton, 
-          { opacity: isLoading ? 0.5 : 1 }
-        ]}>
-          <View style={styles.sendButtonInner}>
-            <Text style={styles.sendButtonText}>➤</Text>
-          </View>
-        </View>
-      </Send>
-    );
-  };
-
   return (
     <View style={styles.container}>
-      <GiftedChat
+      <ChatMessages
         messages={messages}
-        onSend={onSend}
-        user={{
-          _id: 1,
-        }}
-        placeholder={`Ask me anything about your topic...`}
-        renderBubble={renderBubble}
-        renderSend={renderSend}
-        isLoadingEarlier={isLoading}
-        showUserAvatar={false}
-        alwaysShowSend={true}
-        keyboardShouldPersistTaps="never"
-        textInputProps={{
-          editable: !isLoading,
-          style: {
-            borderWidth: 1,
-            borderColor: '#e0e0e0',
-            borderRadius: 20,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            marginHorizontal: 8,
-            marginVertical: 4,
-            maxHeight: 100,
-          },
-        }}
-        bottomOffset={0}
-        minInputToolbarHeight={60}
+        isLoading={isLoading}
+        learningMethodName={learningMethodName}
+      />
+      <ChatInput
+        onSend={handleSendMessage}
+        placeholder="Ask me anything about your topic..."
+        disabled={isLoading}
       />
     </View>
   );
@@ -308,31 +282,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    width: '100%',
-    height: '100%',
-  },
-  sendContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    minHeight: 44,
-  },
-  sendButton: {
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minWidth: 44,
-    minHeight: 32,
-  },
-  sendButtonInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 }); 
