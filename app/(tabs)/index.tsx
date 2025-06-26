@@ -3,10 +3,9 @@ import ChatScreen from '@/components/ChatScreen';
 import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { useAuth } from '@/context/AuthContext';
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Button } from 'react-native-paper';
+import { Button, IconButton } from 'react-native-paper';
 
 interface LearningMethod {
   id: string;
@@ -44,15 +43,6 @@ export default function LearnScreen() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [showStartScreen, setShowStartScreen] = useState(true);
   const [showLearningMethods, setShowLearningMethods] = useState(false);
-  const { signOut } = useAuth();
-
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
 
   const handleStartLearning = () => {
     setShowLearningMethods(true);
@@ -101,27 +91,29 @@ export default function LearnScreen() {
   if (!showStartScreen && currentSession) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Button
-            mode="text"
-            onPress={handleBack}
+        <View style={styles.sessionHeader}>
+          <IconButton
             icon="arrow-left"
-            contentStyle={styles.backButtonContent}
-          >
-            Back
-          </Button>
-          <View style={styles.headerInfo}>
-            <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
+            mode="contained"
+            size={20}
+            onPress={handleBack}
+            style={[styles.backButton, { backgroundColor: '#667eea' }]}
+          />
+          <View style={styles.sessionInfo}>
+            <ThemedText type="defaultSemiBold" style={styles.sessionTitle}>
               {currentSession.learning_method.name}
             </ThemedText>
-            <ThemedText style={styles.headerTopic}>
-              Topic: {currentSession.topic}
+            <ThemedText style={styles.sessionTopic}>
+              {currentSession.topic}
             </ThemedText>
           </View>
           <Button
-            mode="outlined"
+            mode="contained"
             onPress={handleMarkComplete}
             style={styles.completeButton}
+            buttonColor="#4CAF50"
+            textColor="#ffffff"
+            compact
           >
             Complete
           </Button>
@@ -143,30 +135,21 @@ export default function LearnScreen() {
   if (showLearningMethods) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.methodsHeader}>
-          <Button
-            mode="text"
-            onPress={handleBackToStart}
+        <View style={styles.backButtonContainer}>
+          <IconButton
             icon="arrow-left"
-            contentStyle={styles.backButtonContent}
-          >
-            Back
-          </Button>
-          <Button
-            mode="text"
-            onPress={handleLogout}
-            icon="logout"
-            style={styles.logoutButton}
-          >
-            Logout
-          </Button>
+            mode="contained"
+            size={20}
+            onPress={handleBackToStart}
+            style={[styles.backButton, { backgroundColor: '#667eea' }]}
+          />
         </View>
         
-        <ThemedView style={styles.welcomeContainer}>
-          <ThemedText type="title" style={styles.welcomeTitle}>
+        <ThemedView style={styles.methodsWelcomeContainer}>
+          <ThemedText type="title" style={styles.methodsTitle}>
             Choose Learning Method
           </ThemedText>
-          <ThemedText style={styles.welcomeSubtitle}>
+          <ThemedText style={styles.methodsSubtitle}>
             Select how you&apos;d like to learn with AI assistance
           </ThemedText>
         </ThemedView>
@@ -181,16 +164,7 @@ export default function LearnScreen() {
   if (showStartScreen) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.welcomeHeader}>
-          <Button
-            mode="text"
-            onPress={handleLogout}
-            icon="logout"
-            style={styles.logoutButton}
-          >
-            Logout
-          </Button>
-        </View>
+
         
         <ScrollView 
           style={styles.scrollContainer}
@@ -210,6 +184,8 @@ export default function LearnScreen() {
               onPress={handleStartLearning}
               style={styles.startLearningButton}
               contentStyle={styles.startLearningButtonContent}
+              buttonColor="#667eea"
+              textColor="#ffffff"
               icon="school"
             >
               Start Learning
@@ -240,28 +216,78 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  welcomeHeader: {
+  topActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: 8,
     paddingBottom: 8,
   },
-  welcomeContainer: {
-    padding: 20,
-    paddingTop: 20,
+  backButtonContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
+  spacer: {
+    width: 40,
+  },
+  sessionHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  sessionInfo: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 12,
+  },
+  sessionTitle: {
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  sessionTopic: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
+  },
+  backButton: {
+    margin: 0,
+  },
+  completeButton: {
+    borderRadius: 8,
+  },
+  logoutButton: {
+    margin: 0,
+  },
+  methodsWelcomeContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  methodsTitle: {
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  methodsSubtitle: {
+    textAlign: 'center',
+    opacity: 0.7,
+    paddingHorizontal: 20,
   },
   startLearningContainer: {
     padding: 20,
-    paddingTop: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 400,
+    minHeight: 220,
   },
   welcomeTitle: {
     textAlign: 'center',
     marginBottom: 12,
+    lineHeight: 40,
   },
   welcomeSubtitle: {
     textAlign: 'center',
@@ -272,8 +298,8 @@ const styles = StyleSheet.create({
   },
   startLearningButton: {
     marginTop: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 32,
+    paddingVertical: 4,
+    paddingHorizontal: 24,
     borderRadius: 12,
   },
   startLearningButtonContent: {
@@ -286,47 +312,5 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
-    minHeight: 400,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#ffffff',
-  },
-  backButtonContent: {
-    flexDirection: 'row-reverse',
-  },
-  headerInfo: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 16,
-  },
-  headerTitle: {
-    fontSize: 16,
-    color: '#1a1a1a',
-  },
-  headerTopic: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
-  },
-  completeButton: {
-    borderColor: '#4CAF50',
-  },
-  logoutButton: {
-    marginLeft: 8,
-  },
-  methodsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 8,
   },
 });
