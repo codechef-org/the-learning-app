@@ -1,166 +1,134 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
-import { ActivityIndicator, Button, Card, List, Surface } from 'react-native-paper';
-
+import ChatScreen from '@/components/ChatScreen';
+import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/context/AuthContext';
+import React, { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Button } from 'react-native-paper';
 
 interface LearningMethod {
   id: string;
   name: string;
   description: string;
   system_prompt: string;
-  is_active: boolean;
+  icon: string;
+  color: string;
+}
+
+interface ChatSession {
+  id: string;
+  learning_method: LearningMethod;
+  topic: string;
 }
 
 export default function LearnScreen() {
-  const [showMethods, setShowMethods] = useState(false);
-  const [learningMethods, setLearningMethods] = useState<LearningMethod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [showStartScreen, setShowStartScreen] = useState(true);
+  const { signOut } = useAuth();
 
-  useEffect(() => {
-    fetchLearningMethods();
-  }, []);
-
-  const fetchLearningMethods = async () => {
+  const handleLogout = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      const { data, error: fetchError } = await supabase
-        .from('learning_methods')
-        .select('id, name, description, system_prompt, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true });
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      setLearningMethods(data || []);
-    } catch (err) {
-      console.error('Error fetching learning methods:', err);
-      setError('Failed to load learning methods. Please try again.');
-    } finally {
-      setLoading(false);
+      await signOut();
+    } catch (error) {
+      console.error('Error logging out:', error);
     }
   };
 
-  const handleStartLearning = () => {
-    if (learningMethods.length > 0) {
-      setShowMethods(true);
-    } else {
-      // Retry fetching if no methods available
-      fetchLearningMethods();
-    }
+  const handleMethodSelect = async (method: LearningMethod, topic: string, chatId: string) => {
+    // Now using the actual chat ID from the database
+    setCurrentSession({
+      id: chatId,
+      learning_method: method,
+      topic: topic,
+    });
+    setShowStartScreen(false);
   };
 
-  const handleMethodSelect = (method: LearningMethod) => {
-    // TODO: Navigate to chat interface with selected method
-    console.log(`Selected method: ${method.name}`);
-    console.log(`System prompt: ${method.system_prompt}`);
+  const handleBack = () => {
+    setCurrentSession(null);
+    setShowStartScreen(true);
   };
 
-  const getMethodIcon = (methodName: string): string => {
-    const iconMap: { [key: string]: string } = {
-      'Socratic Method': 'help-circle',
-      'Feynman Technique': 'school',
-      'Active Recall': 'brain',
-      'Elaborative Learning': 'connection',
-      'Problem-Based Learning': 'puzzle',
-    };
-    return iconMap[methodName] || 'book-open';
+  const handleMarkComplete = () => {
+    // TODO: Mark the current session as completed in the database
+    console.log('Marking session as complete');
+    handleBack();
   };
 
-  if (loading) {
+  if (!showStartScreen && currentSession) {
     return (
-      <ThemedView style={styles.centerContainer}>
-        <ActivityIndicator size="large" />
-        <ThemedText style={styles.loadingText}>Loading learning methods...</ThemedText>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Button
+            mode="text"
+            onPress={handleBack}
+            icon="arrow-left"
+            contentStyle={styles.backButtonContent}
+          >
+            Back
+          </Button>
+          <View style={styles.headerInfo}>
+            <ThemedText type="defaultSemiBold" style={styles.headerTitle}>
+              {currentSession.learning_method.name}
+            </ThemedText>
+            <ThemedText style={styles.headerTopic}>
+              Topic: {currentSession.topic}
+            </ThemedText>
+          </View>
+          <Button
+            mode="outlined"
+            onPress={handleMarkComplete}
+            style={styles.completeButton}
+          >
+            Complete
+          </Button>
+        </View>
+        
+        <ChatScreen
+          chatId={currentSession.id}
+          systemPrompt={currentSession.learning_method.system_prompt}
+          learningMethodName={currentSession.learning_method.name}
+          onMarkComplete={handleMarkComplete}
+        />
+      </View>
+    );
+  }
+
+  if (showStartScreen) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.welcomeHeader}>
+          <Button
+            mode="text"
+            onPress={handleLogout}
+            icon="logout"
+            style={styles.logoutButton}
+          >
+            Logout
+          </Button>
+        </View>
+        
+        <ThemedView style={styles.welcomeContainer}>
+          <ThemedText type="title" style={styles.welcomeTitle}>
+            AI Learning Assistant
+          </ThemedText>
+          <ThemedText style={styles.welcomeSubtitle}>
+            Choose a learning method and start exploring any topic with AI-powered tutoring
+          </ThemedText>
+        </ThemedView>
+        
+        <View style={styles.methodsContainer}>
+          <LearningMethodsList onSelectMethod={handleMethodSelect} />
+        </View>
       </ThemedView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ThemedView style={styles.content}>
-        <ThemedView style={styles.headerContainer}>
-          <ThemedText type="title" style={styles.title}>
-            Ready to Learn?
-          </ThemedText>
-          <ThemedText style={styles.subtitle}>
-            Choose your preferred learning method and start your journey
-          </ThemedText>
-        </ThemedView>
-
-        {error && (
-          <ThemedView style={styles.errorContainer}>
-            <ThemedText style={styles.errorText}>{error}</ThemedText>
-            <Button mode="outlined" onPress={fetchLearningMethods} style={styles.retryButton}>
-              Retry
-            </Button>
-          </ThemedView>
-        )}
-
-        {!showMethods ? (
-          <ThemedView style={styles.startContainer}>
-            <Surface style={styles.startSurface} elevation={2}>
-              <ThemedText type="subtitle" style={styles.startTitle}>
-                Begin Your Learning Journey
-              </ThemedText>
-              <ThemedText style={styles.startDescription}>
-                Discover various learning methods tailored to your learning style.
-                Each method uses proven pedagogical techniques to enhance your understanding.
-              </ThemedText>
-              <Button
-                mode="contained"
-                onPress={handleStartLearning}
-                style={styles.startButton}
-                contentStyle={styles.buttonContent}
-                disabled={learningMethods.length === 0}
-              >
-                Start Learning
-              </Button>
-              {learningMethods.length === 0 && !loading && (
-                <ThemedText style={styles.noMethodsText}>
-                  No learning methods available
-                </ThemedText>
-              )}
-            </Surface>
-          </ThemedView>
-        ) : (
-          <ThemedView style={styles.methodsContainer}>
-            <ThemedText type="subtitle" style={styles.methodsTitle}>
-              Choose Your Learning Method
-            </ThemedText>
-            
-            {learningMethods.map((method) => (
-              <Card key={method.id} style={styles.methodCard} mode="outlined">
-                <Card.Content>
-                  <List.Item
-                    title={method.name}
-                    description={method.description}
-                    left={(props) => <List.Icon {...props} icon={getMethodIcon(method.name)} />}
-                    right={(props) => <List.Icon {...props} icon="chevron-right" />}
-                    onPress={() => handleMethodSelect(method)}
-                  />
-                </Card.Content>
-              </Card>
-            ))}
-
-            <Button
-              mode="outlined"
-              onPress={() => setShowMethods(false)}
-              style={styles.backButton}
-            >
-              Back to Start
-            </Button>
-          </ThemedView>
-        )}
-      </ThemedView>
-    </ScrollView>
+    <ThemedView style={styles.container}>
+      <LearningMethodsList onSelectMethod={handleMethodSelect} />
+    </ThemedView>
   );
 }
 
@@ -168,94 +136,62 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flex: 1,
+  welcomeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  welcomeContainer: {
     padding: 20,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingTop: 20,
     alignItems: 'center',
-    padding: 20,
   },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-    marginTop: 20,
-  },
-  title: {
-    marginBottom: 10,
+  welcomeTitle: {
     textAlign: 'center',
+    marginBottom: 12,
   },
-  subtitle: {
+  welcomeSubtitle: {
     textAlign: 'center',
     opacity: 0.7,
     paddingHorizontal: 20,
-  },
-  startContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  startSurface: {
-    padding: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    maxWidth: 350,
-    width: '100%',
-  },
-  startTitle: {
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  startDescription: {
-    textAlign: 'center',
-    marginBottom: 25,
-    opacity: 0.8,
     lineHeight: 22,
-  },
-  startButton: {
-    marginTop: 10,
-  },
-  buttonContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
   },
   methodsContainer: {
     flex: 1,
   },
-  methodsTitle: {
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  methodCard: {
-    marginBottom: 12,
-  },
-  backButton: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  loadingText: {
-    marginTop: 15,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    padding: 20,
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
   },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 15,
-    color: '#d32f2f',
+  backButtonContent: {
+    flexDirection: 'row-reverse',
   },
-  retryButton: {
-    marginTop: 10,
+  headerInfo: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 16,
   },
-  noMethodsText: {
-    marginTop: 15,
-    textAlign: 'center',
-    opacity: 0.6,
-    fontSize: 14,
+  headerTitle: {
+    fontSize: 16,
+    color: '#1a1a1a',
+  },
+  headerTopic: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  completeButton: {
+    borderColor: '#4CAF50',
+  },
+  logoutButton: {
+    marginLeft: 8,
   },
 });

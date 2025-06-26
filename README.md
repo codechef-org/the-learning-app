@@ -11,7 +11,7 @@ This tab will have a start learning button. After clicking on the start learning
 
 Each method will have a name and a system prompt associated with it. I will use these methods to learn various topics and figure out what works best for me.
 
-After any of the learning methods is clicked, a chat interface will open. I will be chatting with an AI model like Gemini 2.5 Pro or Open AI O3 with a preconfigured system prompt. 
+After any of the learning methods is clicked, a chat interface will open. I will be chatting with an AI model like Gemini 2.5 Pro with a preconfigured system prompt. 
 
 The chat will go on as defined in the system prompt. 
 
