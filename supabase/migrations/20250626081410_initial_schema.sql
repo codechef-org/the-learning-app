@@ -77,16 +77,6 @@ CREATE TABLE flashcard_reviews (
     ease_factor_after DECIMAL(3,2)
 );
 
--- Chat sessions table (optional - for tracking learning sessions)
-CREATE TABLE chat_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
-    started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    ended_at TIMESTAMP WITH TIME ZONE,
-    duration_minutes INTEGER,
-    message_count INTEGER DEFAULT 0
-);
-
 -- Indexes for better performance
 CREATE INDEX idx_chats_user_id ON chats(user_id);
 CREATE INDEX idx_chats_status ON chats(status);
@@ -200,7 +190,6 @@ ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flashcards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flashcard_reviews ENABLE ROW LEVEL SECURITY;
-ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Chats policies
 CREATE POLICY "Users can view own chats" ON chats FOR SELECT USING (auth.uid() = user_id);
@@ -224,13 +213,7 @@ CREATE POLICY "Users can delete own flashcards" ON flashcards FOR DELETE USING (
 CREATE POLICY "Users can view own reviews" ON flashcard_reviews FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own reviews" ON flashcard_reviews FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Chat sessions policies
-CREATE POLICY "Users can view own chat sessions" ON chat_sessions FOR SELECT 
-USING (chat_id IN (SELECT id FROM chats WHERE user_id = auth.uid()));
-CREATE POLICY "Users can insert own chat sessions" ON chat_sessions FOR INSERT 
-WITH CHECK (chat_id IN (SELECT id FROM chats WHERE user_id = auth.uid()));
-CREATE POLICY "Users can update own chat sessions" ON chat_sessions FOR UPDATE 
-USING (chat_id IN (SELECT id FROM chats WHERE user_id = auth.uid()));
+
 
 -- Learning methods are public (read-only for all authenticated users)
 CREATE POLICY "Anyone can view learning methods" ON learning_methods FOR SELECT TO authenticated USING (true); 
