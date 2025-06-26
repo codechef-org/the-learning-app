@@ -18,3 +18,7 @@ The chat will go on as defined in the system prompt.
 Once I am done learning a topic in a chat, I can mark that chat as done. I will open a new chat for any new topic that I would like to learn.
 
 If I go back from this page, my past chats will show.
+
+# Tech stack
+React native for Android development
+Supabase as the backend
