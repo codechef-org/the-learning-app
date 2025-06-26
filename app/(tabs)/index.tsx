@@ -25,6 +25,7 @@ interface ChatSession {
 export default function LearnScreen() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [showStartScreen, setShowStartScreen] = useState(true);
+  const [showLearningMethods, setShowLearningMethods] = useState(false);
   const { signOut } = useAuth();
 
   const handleLogout = async () => {
@@ -35,6 +36,11 @@ export default function LearnScreen() {
     }
   };
 
+  const handleStartLearning = () => {
+    setShowLearningMethods(true);
+    setShowStartScreen(false);
+  };
+
   const handleMethodSelect = async (method: LearningMethod, topic: string, chatId: string) => {
     // Now using the actual chat ID from the database
     setCurrentSession({
@@ -43,10 +49,17 @@ export default function LearnScreen() {
       topic: topic,
     });
     setShowStartScreen(false);
+    setShowLearningMethods(false);
   };
 
   const handleBack = () => {
     setCurrentSession(null);
+    setShowStartScreen(true);
+    setShowLearningMethods(false);
+  };
+
+  const handleBackToStart = () => {
+    setShowLearningMethods(false);
     setShowStartScreen(true);
   };
 
@@ -95,6 +108,44 @@ export default function LearnScreen() {
     );
   }
 
+  if (showLearningMethods) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.methodsHeader}>
+          <Button
+            mode="text"
+            onPress={handleBackToStart}
+            icon="arrow-left"
+            contentStyle={styles.backButtonContent}
+          >
+            Back
+          </Button>
+          <Button
+            mode="text"
+            onPress={handleLogout}
+            icon="logout"
+            style={styles.logoutButton}
+          >
+            Logout
+          </Button>
+        </View>
+        
+        <ThemedView style={styles.welcomeContainer}>
+          <ThemedText type="title" style={styles.welcomeTitle}>
+            Choose Learning Method
+          </ThemedText>
+          <ThemedText style={styles.welcomeSubtitle}>
+            Select how you'd like to learn with AI assistance
+          </ThemedText>
+        </ThemedView>
+        
+        <View style={styles.methodsContainer}>
+          <LearningMethodsList onSelectMethod={handleMethodSelect} />
+        </View>
+      </ThemedView>
+    );
+  }
+
   if (showStartScreen) {
     return (
       <ThemedView style={styles.container}>
@@ -109,18 +160,24 @@ export default function LearnScreen() {
           </Button>
         </View>
         
-        <ThemedView style={styles.welcomeContainer}>
+        <ThemedView style={styles.startLearningContainer}>
           <ThemedText type="title" style={styles.welcomeTitle}>
             AI Learning Assistant
           </ThemedText>
           <ThemedText style={styles.welcomeSubtitle}>
-            Choose a learning method and start exploring any topic with AI-powered tutoring
+            Ready to start your learning journey? Get personalized AI tutoring on any topic you would like to explore.
           </ThemedText>
+          
+          <Button
+            mode="contained"
+            onPress={handleStartLearning}
+            style={styles.startLearningButton}
+            contentStyle={styles.startLearningButtonContent}
+            icon="school"
+          >
+            Start Learning
+          </Button>
         </ThemedView>
-        
-        <View style={styles.methodsContainer}>
-          <LearningMethodsList onSelectMethod={handleMethodSelect} />
-        </View>
       </ThemedView>
     );
   }
@@ -140,13 +197,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 60,
     paddingBottom: 8,
   },
   welcomeContainer: {
     padding: 20,
     paddingTop: 20,
     alignItems: 'center',
+  },
+  startLearningContainer: {
+    flex: 1,
+    padding: 20,
+    paddingTop: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   welcomeTitle: {
     textAlign: 'center',
@@ -157,6 +221,17 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     paddingHorizontal: 20,
     lineHeight: 22,
+    marginBottom: 40,
+  },
+  startLearningButton: {
+    marginTop: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+  },
+  startLearningButtonContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
   methodsContainer: {
     flex: 1,
@@ -166,7 +241,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 60,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#ffffff',
@@ -193,5 +269,12 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginLeft: 8,
+  },
+  methodsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 8,
   },
 });
