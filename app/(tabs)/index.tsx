@@ -98,12 +98,15 @@ export default function LearnScreen() {
           </Button>
         </View>
         
-        <ChatScreen
-          chatId={currentSession.id}
-          systemPrompt={currentSession.learning_method.system_prompt}
-          learningMethodName={currentSession.learning_method.name}
-          onMarkComplete={handleMarkComplete}
-        />
+        <View style={styles.chatContainer}>
+          <ChatScreen
+            chatId={currentSession.id}
+            systemPrompt={currentSession.learning_method.system_prompt}
+            learningMethodName={currentSession.learning_method.name}
+            topic={currentSession.topic}
+            onMarkComplete={handleMarkComplete}
+          />
+        </View>
       </View>
     );
   }
@@ -135,7 +138,7 @@ export default function LearnScreen() {
             Choose Learning Method
           </ThemedText>
           <ThemedText style={styles.welcomeSubtitle}>
-            Select how you'd like to learn with AI assistance
+            Select how you&apos;d like to learn with AI assistance
           </ThemedText>
         </ThemedView>
         
@@ -192,6 +195,7 @@ export default function LearnScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#ffffff',
   },
   welcomeHeader: {
     flexDirection: 'row',
@@ -235,6 +239,11 @@ const styles = StyleSheet.create({
   },
   methodsContainer: {
     flex: 1,
+  },
+  chatContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    minHeight: 400,
   },
   header: {
     flexDirection: 'row',

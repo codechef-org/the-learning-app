@@ -8,6 +8,7 @@ interface ChatScreenProps {
   chatId: string;
   systemPrompt: string;
   learningMethodName: string;
+  topic: string;
   onMarkComplete?: () => void;
 }
 
@@ -20,10 +21,12 @@ export default function ChatScreen({
   chatId, 
   systemPrompt, 
   learningMethodName,
+  topic,
   onMarkComplete 
 }: ChatScreenProps) {
   const [messages, setMessages] = useState<IMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -54,9 +57,89 @@ export default function ChatScreen({
         .reverse(); // Gifted Chat expects newest messages first
 
       setMessages(giftedMessages);
+      setHasLoadedInitially(true);
+
+      // If this is a new chat (no messages), automatically send the first message
+      if (messagesData.length === 0 && topic.trim()) {
+        setTimeout(() => {
+          sendInitialMessage();
+        }, 500); // Small delay to ensure UI is ready
+      }
     } catch (error) {
       console.error('Error loading chat history:', error);
       Alert.alert('Error', 'Failed to load chat history');
+      setHasLoadedInitially(true);
+    }
+  };
+
+  const sendInitialMessage = async () => {
+    const initialMessage = `I want to learn about: ${topic}`;
+    
+    const userMessage: IMessage = {
+      _id: Math.random().toString(),
+      text: initialMessage,
+      createdAt: new Date(),
+      user: {
+        _id: 1,
+        name: 'You',
+      },
+    };
+
+    // Add user message to UI immediately
+    setMessages(previousMessages => GiftedChat.append(previousMessages, [userMessage]));
+    setIsLoading(true);
+
+    try {
+      // Call the Supabase Edge Function
+      const { data: session } = await supabase.auth.getSession();
+      
+      if (!session.session?.access_token) {
+        throw new Error('No authentication token available');
+      }
+
+      const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ai-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.session.access_token}`,
+        },
+        body: JSON.stringify({
+          message: initialMessage,
+          chatId,
+          systemPrompt,
+          chatHistory: [],
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to get AI response');
+      }
+
+      // Add AI response to UI
+      const aiMessage: IMessage = {
+        _id: Math.random().toString(),
+        text: result.response,
+        createdAt: new Date(),
+        user: {
+          _id: 2,
+          name: learningMethodName,
+          avatar: '🤖',
+        },
+      };
+
+      setMessages(previousMessages => GiftedChat.append(previousMessages, [aiMessage]));
+    } catch (error) {
+      console.error('Error sending initial message:', error);
+      Alert.alert('Error', 'Failed to start conversation. Please try again.');
+      
+      // Remove the user message that failed to send
+      setMessages(previousMessages => 
+        previousMessages.filter(msg => msg._id !== userMessage._id)
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -199,11 +282,23 @@ export default function ChatScreen({
         renderSend={renderSend}
         isLoadingEarlier={isLoading}
         showUserAvatar={false}
-        alwaysShowSend
+        alwaysShowSend={true}
         keyboardShouldPersistTaps="never"
         textInputProps={{
           editable: !isLoading,
+          style: {
+            borderWidth: 1,
+            borderColor: '#e0e0e0',
+            borderRadius: 20,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            marginHorizontal: 8,
+            marginVertical: 4,
+            maxHeight: 100,
+          },
         }}
+        bottomOffset={0}
+        minInputToolbarHeight={60}
       />
     </View>
   );
@@ -213,18 +308,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    width: '100%',
+    height: '100%',
   },
   sendContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
+    minHeight: 44,
   },
   sendButton: {
     borderRadius: 20,
     backgroundColor: '#007AFF',
     paddingHorizontal: 12,
     paddingVertical: 8,
+    minWidth: 44,
+    minHeight: 32,
   },
   sendButtonInner: {
     alignItems: 'center',
