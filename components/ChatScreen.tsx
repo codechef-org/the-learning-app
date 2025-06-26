@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Keyboard, Platform, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import ChatInput from './ChatInput';
@@ -28,11 +29,35 @@ export default function ChatScreen({
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   
   // Ref to track if component is mounted for cleanup
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -264,16 +289,28 @@ export default function ChatScreen({
 
   return (
     <View style={styles.container}>
-      <ChatMessages
-        messages={messages}
-        isLoading={isLoading}
-        learningMethodName={learningMethodName}
-      />
-      <ChatInput
-        onSend={handleSendMessage}
-        placeholder="Ask me anything about your topic..."
-        disabled={isLoading}
-      />
+      <View style={[styles.messagesContainer, { 
+        paddingBottom: keyboardHeight > 0 ? keyboardHeight : 80 // 80px for input height when keyboard is hidden
+      }]}>
+        <ChatMessages
+          messages={messages}
+          isLoading={isLoading}
+          learningMethodName={learningMethodName}
+        />
+      </View>
+      <View style={[
+        styles.inputContainer, 
+        { 
+          bottom: keyboardHeight > 0 ? keyboardHeight - insets.bottom : 0,
+        }
+      ]}>
+        <ChatInput
+          onSend={handleSendMessage}
+          placeholder="Ask me anything about your topic..."
+          disabled={isLoading}
+          isKeyboardVisible={keyboardHeight > 0}
+        />
+      </View>
     </View>
   );
 }
@@ -281,6 +318,16 @@ export default function ChatScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  messagesContainer: {
+    flex: 1,
+  },
+  inputContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#FFFFFF',
   },
 }); 
