@@ -5,6 +5,8 @@ import { StatusBar } from 'expo-status-bar';
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 
+import AuthGuard from '@/components/AuthGuard';
+import { AuthProvider } from '@/context/AuthContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function RootLayout() {
@@ -21,14 +23,22 @@ export default function RootLayout() {
   const paperTheme = colorScheme === 'dark' ? MD3DarkTheme : MD3LightTheme;
 
   return (
-    <PaperProvider theme={paperTheme}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </PaperProvider>
+    <AuthProvider>
+      <PaperProvider theme={paperTheme}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+
+
+
+          <AuthGuard>
+            <Stack>
+              <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="+not-found" />
+            </Stack>
+          </AuthGuard>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </PaperProvider>
+    </AuthProvider>
   );
 }
