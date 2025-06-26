@@ -15,6 +15,8 @@ CREATE TABLE learning_methods (
     system_prompt TEXT NOT NULL,
     description TEXT,
     is_active BOOLEAN DEFAULT true,
+    icon VARCHAR(50) DEFAULT 'help-circle',
+    color VARCHAR(7) DEFAULT '#007AFF',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -156,33 +158,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Insert some default learning methods
-INSERT INTO learning_methods (name, system_prompt, description) VALUES
-(
-    'Socratic Method',
-    'You are a Socratic tutor. Instead of directly providing answers, guide the student to discover knowledge through thoughtful questions. Ask probing questions that help them think critically and arrive at conclusions themselves. Encourage deep thinking and self-reflection.',
-    'Learn through guided questioning and critical thinking'
-),
-(
-    'Feynman Technique',
-    'You are a tutor using the Feynman Technique. Help the student explain concepts in simple terms as if teaching a child. When they struggle to explain something simply, guide them to identify gaps in their understanding and help them fill those gaps.',
-    'Learn by explaining concepts in simple, clear language'
-),
-(
-    'Active Recall',
-    'You are a tutor focused on active recall. Present information, then immediately test the student''s understanding through questions and scenarios. Encourage them to retrieve information from memory rather than just reading passively.',
-    'Learn through active retrieval and testing of knowledge'
-),
-(
-    'Elaborative Learning',
-    'You are a tutor who helps students connect new information to existing knowledge. Encourage them to find relationships, create analogies, and build upon what they already know. Help them create rich mental models.',
-    'Learn by connecting new concepts to existing knowledge'
-),
-(
-    'Problem-Based Learning',
-    'You are a tutor who presents real-world problems for the student to solve. Guide them through the problem-solving process, helping them apply theoretical knowledge to practical situations.',
-    'Learn through solving real-world problems and applications'
-);
 
 -- RLS (Row Level Security) policies for Supabase
 -- Note: auth.users table RLS is managed by Supabase automatically
