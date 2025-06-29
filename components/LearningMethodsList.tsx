@@ -207,11 +207,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     marginBottom: 24,
+    textAlign: 'center',
   },
   listContainer: {
     paddingBottom: 20,

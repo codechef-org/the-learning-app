@@ -3,9 +3,11 @@ import ChatScreen from '@/components/ChatScreen';
 import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-import React, { useState } from 'react';
+import { useNavigation } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton } from 'react-native-paper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface LearningMethod {
   id: string;
@@ -43,6 +45,19 @@ export default function LearnScreen() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [showStartScreen, setShowStartScreen] = useState(true);
   const [showLearningMethods, setShowLearningMethods] = useState(false);
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+
+  // Dynamic header control based on chat state
+  useEffect(() => {
+    if (currentSession || showLearningMethods) {
+      // Hide header when chat is active
+      navigation.setOptions({ headerShown: false });
+    } else {
+      // Show header when on start screen or learning methods
+      navigation.setOptions({ headerShown: true });
+    }
+  }, [currentSession, navigation, showLearningMethods]);
 
   const handleStartLearning = () => {
     setShowLearningMethods(true);
@@ -91,7 +106,7 @@ export default function LearnScreen() {
   if (!showStartScreen && currentSession) {
     return (
       <View style={styles.container}>
-        <View style={styles.sessionHeader}>
+        <View style={[styles.sessionHeader, { paddingTop: insets.top }]}>
           <IconButton
             icon="arrow-left"
             mode="contained"
@@ -135,7 +150,7 @@ export default function LearnScreen() {
   if (showLearningMethods) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.backButtonContainer}>
+        <View style={[styles.backButtonContainer, { paddingTop: insets.top }]}>
           <IconButton
             icon="arrow-left"
             mode="contained"
@@ -145,14 +160,7 @@ export default function LearnScreen() {
           />
         </View>
         
-        <ThemedView style={styles.methodsWelcomeContainer}>
-          <ThemedText type="title" style={styles.methodsTitle}>
-            Choose Learning Method
-          </ThemedText>
-          <ThemedText style={styles.methodsSubtitle}>
-            Select how you&apos;d like to learn with AI assistance
-          </ThemedText>
-        </ThemedView>
+
         
         <View style={styles.methodsContainer}>
           <LearningMethodsList onSelectMethod={handleMethodSelect} />
