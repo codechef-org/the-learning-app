@@ -1,3 +1,4 @@
+import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Keyboard, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -289,6 +290,7 @@ export default function ChatScreen({
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" />
       <View style={[styles.messagesContainer, { 
         paddingBottom: keyboardHeight > 0 ? keyboardHeight : 80 // 80px for input height when keyboard is hidden
       }]}>

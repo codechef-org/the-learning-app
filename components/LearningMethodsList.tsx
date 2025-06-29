@@ -1,3 +1,4 @@
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
@@ -127,6 +128,7 @@ export default function LearningMethodsList({ onSelectMethod }: LearningMethodsL
 
   return (
     <View style={styles.container}>
+      <StatusBar style="dark" />
       <Text style={styles.title}>Choose Your Learning Method</Text>
       <Text style={styles.subtitle}>
         Select a learning approach that works best for you

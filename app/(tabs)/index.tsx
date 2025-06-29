@@ -4,6 +4,7 @@ import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useNavigation } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, IconButton } from 'react-native-paper';
@@ -106,6 +107,7 @@ export default function LearnScreen() {
   if (!showStartScreen && currentSession) {
     return (
       <View style={styles.container}>
+        <StatusBar style="dark" />
         <View style={[styles.sessionHeader, { paddingTop: insets.top }]}>
           <IconButton
             icon="arrow-left"
