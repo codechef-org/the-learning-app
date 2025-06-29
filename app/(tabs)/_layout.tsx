@@ -89,7 +89,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="revise"
         options={{
           title: 'Revise',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="arrow.clockwise" color={color} />,
