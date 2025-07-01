@@ -15,7 +15,7 @@ interface ChatMessage {
 }
 
 interface GeneratedFlashcard {
-  type: 'QnA' | 'Definition' | 'Cloze';
+  type: 'qa' | 'definition' | 'cloze';
   front: string;
   back: string;
   tags: string[];
@@ -411,7 +411,60 @@ async function generateFlashcardsWithAI(chat: any, messages: ChatMessage[]): Pro
   const lastMessage = new Date(messages[messages.length - 1].created_at)
   const durationMinutes = Math.round((lastMessage.getTime() - firstMessage.getTime()) / (1000 * 60))
 
-  const prompt = `Based on this learning conversation about "${chat.topic}", generate flashcards that help reinforce key concepts.
+  const prompt = `You are an expert in cognitive science and learning, specializing in creating optimal retrieval practice prompts. Your mission is to convert a conversation transcript into a set of high-quality, atomic flashcards that adhere to the principles of effective learning.
+
+**Core Guiding Principles:**
+1.  **Focused and Atomic:** Each flashcard must test only ONE discrete piece of information (a single fact, concept, or step). This is the most important rule.
+2.  **Precise and Unambiguous:** The "front" of the card must be a question or cue that leads to a single, specific, and consistent correct answer. Avoid vague questions that could have multiple valid answers.
+3.  **Tractable yet Effortful:** The prompt should require genuine memory retrieval (be effortful), but not be so complex or obscure that it's impossible to answer (be tractable). It should be a challenge, not a source of frustration.
+4.  **No Trivial Inference:** The answer on the "back" should not be easily guessable from the wording of the "front." The user must access their memory, not just use logic.
+
+**Your Task:**
+1.  Analyze the provided conversation between a 'User' and an 'AI Tutor'.
+2.  **Decompose** all complex topics into their smallest logical, testable components. This is your primary goal. For example, instead of one card for "photosynthesis," create separate cards for its inputs, outputs, stages, and the definition of chlorophyll.
+3.  For each component, create a single flashcard in the most appropriate format. Choose from the types below.
+4.  Generate relevant topic tags for organization.
+5.  **AVOID:** Creating overly broad questions like "Summarize X" or "Explain everything about Y." These are ineffective for retrieval practice.
+
+**Flashcard Types:**
+*   **"qa":** For a standard Question/Answer. Ideal for cause-and-effect, "why," or "how" questions.
+*   **"definition":** For key terms. The "front" is the term, the "back" is the precise definition.
+*   **"cloze":** For fill-in-the-blank. Excellent for making prompts tractable and testing key vocabulary within context. Use the format "Sentence with the {{c1::key term}} removed."
+
+**Output Format:**
+Return your response as a single JSON array of flashcard objects. Adhere strictly to this format. Do not include any explanatory text outside the JSON structure.
+
+**Example JSON Output:**
+[
+  {
+    "type": "qa",
+    "front": "What are the two primary INPUTS for the light-dependent reactions in photosynthesis?",
+    "back": "Water (H₂O) and light energy.",
+    "tags": ["biology", "photosynthesis", "light-reactions"]
+  },
+  {
+    "type": "qa",
+    "front": "What is the main OUTPUT of the Calvin Cycle (light-independent reactions)?",
+    "back": "Glucose (a sugar/carbohydrate).",
+    "tags": ["biology", "photosynthesis", "calvin-cycle"]
+  },
+  {
+    "type": "definition",
+    "front": "Retrieval-Induced Forgetting",
+    "back": "A memory phenomenon where remembering one item from a category inhibits the ability to recall other, related items from the same category that were not retrieved.",
+    "tags": ["cognitive-science", "memory"]
+  },
+  {
+    "type": "cloze",
+    "front": "In the context of retrieval practice, prompts should be difficult enough to be {{c1::effortful}}, but not so hard they become frustrating.",
+    "back": "In the context of retrieval practice, prompts should be difficult enough to be effortful, but not so hard they become frustrating.",
+    "tags": ["cognitive-science", "learning-theory"]
+  }
+]
+
+**Conversation to Process:**
+
+Based on this learning conversation about "${chat.topic}", generate flashcards that help reinforce key concepts.
 
 Conversation Context:
 - Title: ${chat.title}
@@ -420,35 +473,11 @@ Conversation Context:
 - Messages: ${messages.length}
 
 Conversation:
-${conversation}
-
-Generate flashcards in JSON format with this exact structure:
-{
-  "flashcards": [
-    {
-      "type": "QnA",
-      "front": "Question or prompt",
-      "back": "Answer or explanation",
-      "tags": ["tag1", "tag2"]
-    }
-  ]
-}
-
-Guidelines:
-- Maximum 5 flashcards per conversation
-- Focus on key concepts, definitions, and important facts learned
-- Avoid flashcards for small talk, greetings, or procedural information
-- Use clear, concise language suitable for review
-- Generate diverse flashcard types when appropriate (QnA, Definition, Cloze)
-- Tags should be relevant keywords (no spaces, use underscores if needed)
-- Only generate flashcards if there's meaningful educational content
-- Return empty array if conversation lacks educational value
-
-Respond ONLY with valid JSON, no additional text.`
+${conversation}`
 
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-exp:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -459,10 +488,9 @@ Respond ONLY with valid JSON, no additional text.`
             { role: 'user', parts: [{ text: prompt }] }
           ],
           generationConfig: {
+            response_mime_type: 'application/json',
             temperature: 0.3, // Lower temperature for more consistent JSON output
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 8192,
           },
           safetySettings: [
             {
@@ -502,22 +530,27 @@ Respond ONLY with valid JSON, no additional text.`
     
     // Parse JSON response
     try {
-      const parsedResponse: FlashcardGenerationResponse = JSON.parse(aiResponse)
-      
-      if (!parsedResponse.flashcards || !Array.isArray(parsedResponse.flashcards)) {
-        console.error('Invalid flashcard response format:', aiResponse)
+      const parsedJson = JSON.parse(aiResponse)
+      let flashcards: GeneratedFlashcard[];
+
+      if (Array.isArray(parsedJson)) {
+        flashcards = parsedJson;
+      } else if (parsedJson.flashcards && Array.isArray(parsedJson.flashcards)) {
+        flashcards = parsedJson.flashcards;
+      } else {
+        console.error('Invalid flashcard response format. Expected an array of flashcards or an object with a "flashcards" key.', aiResponse)
         return []
       }
-
+      
       // Validate and filter flashcards
-      const validFlashcards = parsedResponse.flashcards.filter(flashcard => {
+      const validFlashcards = flashcards.filter(flashcard => {
         return flashcard.type && 
                flashcard.front && 
                flashcard.back && 
-               ['QnA', 'Definition', 'Cloze'].includes(flashcard.type) &&
+               ['qa', 'definition', 'cloze'].includes(flashcard.type.toLowerCase()) &&
                flashcard.front.trim().length > 0 &&
                flashcard.back.trim().length > 0
-      }).slice(0, 5) // Limit to 5 flashcards max
+      })
 
       return validFlashcards
 

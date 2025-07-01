@@ -34,7 +34,7 @@ CREATE TABLE flashcard_chat_processing (
 CREATE TABLE flashcards (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    type VARCHAR(20) NOT NULL CHECK (type IN ('QnA', 'Definition', 'Cloze')),
+    type VARCHAR(20) NOT NULL CHECK (type IN ('qa', 'definition', 'cloze')),
     front TEXT NOT NULL,
     back TEXT NOT NULL,
     tags TEXT[], -- Array of AI generated tags
