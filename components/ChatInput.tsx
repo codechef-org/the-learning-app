@@ -11,14 +11,12 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  isKeyboardVisible?: boolean;
 }
 
 export default function ChatInput({ 
   onSend, 
   placeholder = "Type your message...", 
-  disabled = false,
-  isKeyboardVisible = false
+  disabled = false
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
 
@@ -36,7 +34,6 @@ export default function ChatInput({
     <View style={styles.container}>
       <View style={[
         styles.inputContainer,
-        isKeyboardVisible && styles.inputContainerKeyboardUp
       ]}>
         <View style={styles.inputWrapper}>
           <TextInput
@@ -87,9 +84,6 @@ const styles = StyleSheet.create({
   inputContainer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  inputContainerKeyboardUp: {
-    paddingBottom: 0,
   },
   inputWrapper: {
     flexDirection: 'row',
