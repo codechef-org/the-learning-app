@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
 
@@ -73,14 +73,12 @@ export default function ChatMessages({
                   fontSize: 16,
                   lineHeight: 20,
                   margin: 0,
+                  width: '100%',
                 },
                 paragraph: {
                   marginTop: 0,
                   marginBottom: 8,
-                  flexWrap: 'wrap',
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                  justifyContent: 'flex-start',
+                  width: '100%',
                 },
                 strong: {
                   fontWeight: 'bold',
@@ -102,6 +100,7 @@ export default function ChatMessages({
                   fontFamily: 'Courier',
                   fontSize: 14,
                   marginVertical: 8,
+                  width: '100%',
                 },
                 blockquote: {
                   backgroundColor: '#f9f9f9',
@@ -109,30 +108,39 @@ export default function ChatMessages({
                   borderLeftColor: '#ddd',
                   paddingLeft: 10,
                   marginVertical: 8,
+                  width: '100%',
                 },
                 list_item: {
                   marginVertical: 2,
+                  width: '100%',
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
                 },
                 bullet_list: {
                   marginVertical: 8,
+                  width: '100%',
                 },
                 ordered_list: {
                   marginVertical: 8,
+                  width: '100%',
                 },
                 heading1: {
                   fontSize: 20,
                   fontWeight: 'bold',
                   marginVertical: 8,
+                  width: '100%',
                 },
                 heading2: {
                   fontSize: 18,
                   fontWeight: 'bold',
                   marginVertical: 6,
+                  width: '100%',
                 },
                 heading3: {
                   fontSize: 16,
                   fontWeight: 'bold',
                   marginVertical: 4,
+                  width: '100%',
                 },
                 link: {
                   color: '#007AFF',
@@ -142,6 +150,7 @@ export default function ChatMessages({
                   backgroundColor: '#ddd',
                   height: 1,
                   marginVertical: 10,
+                  width: '100%',
                 },
               }}
             >
