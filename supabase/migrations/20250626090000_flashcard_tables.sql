@@ -23,7 +23,7 @@ CREATE TABLE flashcard_chat_processing (
     cron_run_id UUID NOT NULL REFERENCES flashcard_cron_runs(id) ON DELETE CASCADE,
     chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
     last_processed_message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
-    status VARCHAR(20) DEFAULT 'processed' CHECK (status IN ('processed', 'failed', 'skipped')),
+    status VARCHAR(20) DEFAULT 'processed' CHECK (status IN ('processed', 'failed', 'skipped', 'processing')),
     flashcards_generated INTEGER DEFAULT 0,
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     error_message TEXT
