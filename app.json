@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "the-learning-app",
+    "name": "The learning app",
     "slug": "the-learning-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.justani.thelearningapp"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1823634d-e7e6-407b-8a9b-4bdec6487094"
+      }
     }
   }
 }
