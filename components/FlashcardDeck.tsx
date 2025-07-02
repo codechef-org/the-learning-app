@@ -3,19 +3,19 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    StyleSheet,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import {
-    LongPressGestureHandler,
-    PanGestureHandler,
-    PanGestureHandlerGestureEvent,
-    State
+  LongPressGestureHandler,
+  PanGestureHandler,
+  PanGestureHandlerGestureEvent,
+  State
 } from 'react-native-gesture-handler';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
@@ -462,15 +462,6 @@ export default function FlashcardDeck() {
                 {parts}
               </View>
             </View>
-            {card.tags.length > 0 && (
-              <View style={styles.tagsContainer}>
-                {card.tags.map((tag, index) => (
-                  <View key={index} style={[styles.tag, { backgroundColor: tintColor }]}>
-                    <ThemedText style={styles.tagText}>{tag}</ThemedText>
-                  </View>
-                ))}
-              </View>
-            )}
           </View>
         );
       }
@@ -487,15 +478,6 @@ export default function FlashcardDeck() {
             {card.type.toUpperCase()}
           </ThemedText>
           <ThemedText style={[styles.cardText, { color: textColor }]}>{cleanContent}</ThemedText>
-          {card.tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {card.tags.map((tag, index) => (
-                <View key={index} style={[styles.tag, { backgroundColor: tintColor }]}>
-                  <ThemedText style={styles.tagText}>{tag}</ThemedText>
-                </View>
-              ))}
-            </View>
-          )}
         </View>
       );
     }
@@ -506,15 +488,6 @@ export default function FlashcardDeck() {
           {card.type.toUpperCase()}
         </ThemedText>
         <ThemedText style={[styles.cardText, { color: textColor }]}>{content}</ThemedText>
-        {card.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {card.tags.map((tag, index) => (
-              <View key={index} style={[styles.tag, { backgroundColor: tintColor }]}>
-                <ThemedText style={styles.tagText}>{tag}</ThemedText>
-              </View>
-            ))}
-          </View>
-        )}
       </View>
     );
   };
@@ -794,26 +767,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
-  tagsContainer: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  tag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    margin: 2,
-  },
-  tagText: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '500',
-  },
+
   instructions: {
     marginTop: 40,
     paddingHorizontal: 20,
