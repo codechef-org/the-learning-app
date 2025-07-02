@@ -6,7 +6,6 @@ import { StyleSheet } from 'react-native';
 export default function ReviseScreen() {
   return (
     <ThemedView style={styles.container}>
-    
       <FlashcardDeck />
     </ThemedView>
   );

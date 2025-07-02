@@ -4,16 +4,18 @@ import { supabase } from '@/lib/supabase';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Animated,
     Dimensions,
     StyleSheet,
     TouchableWithoutFeedback,
-    View,
+    View
 } from 'react-native';
 import {
+    LongPressGestureHandler,
     PanGestureHandler,
     PanGestureHandlerGestureEvent,
-    State,
+    State
 } from 'react-native-gesture-handler';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
@@ -38,6 +40,7 @@ export default function FlashcardDeck() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
@@ -53,6 +56,7 @@ export default function FlashcardDeck() {
   const translateY = useRef(new Animated.Value(0)).current;
   const rotate = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
+  const deleteOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (user) {
@@ -66,6 +70,100 @@ export default function FlashcardDeck() {
       fetchMoreFlashcards();
     }
   }, [currentIndex, flashcards.length]);
+
+  const deleteFlashcard = async (flashcardId: string) => {
+    if (!user) return;
+
+    try {
+      setIsDeleting(true);
+      
+      const { error } = await supabase
+        .from('flashcards')
+        .update({ is_deleted: true })
+        .eq('id', flashcardId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Remove the deleted flashcard from the local state
+      setFlashcards(prev => prev.filter(card => card.id !== flashcardId));
+      
+      // If we deleted the current card, reset the flip state
+      setIsFlipped(false);
+      resetCardPosition();
+      
+      // If this was the last card, the currentIndex will automatically be handled
+      // by the component re-render since flashcards.length will be reduced
+      
+    } catch (error) {
+      console.error('Error deleting flashcard:', error);
+      Alert.alert(
+        'Error',
+        'Failed to delete flashcard. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleLongPress = () => {
+    if (isDeleting || currentIndex >= flashcards.length) return;
+    
+    const currentCard = flashcards[currentIndex];
+    
+    // Only allow deletion of real flashcards, not sample ones
+    if (currentCard.id.startsWith('sample-')) {
+      Alert.alert(
+        'Cannot Delete',
+        'This is a sample flashcard and cannot be deleted.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Delete Flashcard',
+      'Are you sure you want to delete this flashcard? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteFlashcard(currentCard.id),
+        },
+      ]
+    );
+  };
+
+  const onLongPressStateChange = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      // Visual feedback for long press
+      Animated.timing(deleteOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else if (event.nativeEvent.state === State.END) {
+      // Hide visual feedback and trigger delete
+      Animated.timing(deleteOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      handleLongPress();
+    } else if (event.nativeEvent.state === State.CANCELLED || event.nativeEvent.state === State.FAILED) {
+      // Hide visual feedback
+      Animated.timing(deleteOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
 
   // Sample flashcards for testing
   const sampleFlashcards: Flashcard[] = [
@@ -508,66 +606,83 @@ export default function FlashcardDeck() {
         )}
 
         {/* Current card */}
-        <PanGestureHandler
-          onGestureEvent={onGestureEvent}
-          onHandlerStateChange={onHandlerStateChange}
+        <LongPressGestureHandler
+          onHandlerStateChange={onLongPressStateChange}
+          minDurationMs={800}
         >
-          <Animated.View
-            style={[
-              styles.card,
-              styles.currentCard,
-              {
-                transform: [
-                  { translateX },
-                  { translateY },
-                  { rotate: rotate.interpolate({
-                    inputRange: [-1, 1],
-                    outputRange: ['-1deg', '1deg'],
-                  }) },
-                  { scale },
-                ],
-              },
-            ]}
+          <PanGestureHandler
+            onGestureEvent={onGestureEvent}
+            onHandlerStateChange={onHandlerStateChange}
           >
-            <TouchableWithoutFeedback onPress={flipCard}>
-              <View style={styles.cardInteractionArea}>
-                {/* Front of card */}
-                <Animated.View
-                  style={[
-                    styles.cardFace,
-                    { 
-                      backgroundColor: cardFrontColor,
-                      shadowColor: shadowColor,
-                    },
-                    frontAnimatedStyle,
-                  ]}
-                >
-                  {renderFlashcardContent(currentCard, 'front')}
-                </Animated.View>
+            <Animated.View
+              style={[
+                styles.card,
+                styles.currentCard,
+                {
+                  transform: [
+                    { translateX },
+                    { translateY },
+                    { rotate: rotate.interpolate({
+                      inputRange: [-1, 1],
+                      outputRange: ['-1deg', '1deg'],
+                    }) },
+                    { scale },
+                  ],
+                },
+              ]}
+            >
+              <TouchableWithoutFeedback onPress={flipCard}>
+                <View style={styles.cardInteractionArea}>
+                  {/* Delete overlay */}
+                  <Animated.View
+                    style={[
+                      styles.deleteOverlay,
+                      {
+                        opacity: deleteOpacity,
+                      },
+                    ]}
+                  >
+                    <ThemedText style={styles.deleteText}>🗑️ Release to Delete</ThemedText>
+                  </Animated.View>
 
-                {/* Back of card */}
-                <Animated.View
-                  style={[
-                    styles.cardFace,
-                    styles.cardBack,
-                    { 
-                      backgroundColor: cardBackColor,
-                      shadowColor: shadowColor,
-                    },
-                    backAnimatedStyle,
-                  ]}
-                >
-                  {renderFlashcardContent(currentCard, 'back')}
-                </Animated.View>
-              </View>
-            </TouchableWithoutFeedback>
-          </Animated.View>
-        </PanGestureHandler>
+                  {/* Front of card */}
+                  <Animated.View
+                    style={[
+                      styles.cardFace,
+                      { 
+                        backgroundColor: cardFrontColor,
+                        shadowColor: shadowColor,
+                      },
+                      frontAnimatedStyle,
+                    ]}
+                  >
+                    {renderFlashcardContent(currentCard, 'front')}
+                  </Animated.View>
+
+                  {/* Back of card */}
+                  <Animated.View
+                    style={[
+                      styles.cardFace,
+                      styles.cardBack,
+                      { 
+                        backgroundColor: cardBackColor,
+                        shadowColor: shadowColor,
+                      },
+                      backAnimatedStyle,
+                    ]}
+                  >
+                    {renderFlashcardContent(currentCard, 'back')}
+                  </Animated.View>
+                </View>
+              </TouchableWithoutFeedback>
+            </Animated.View>
+          </PanGestureHandler>
+        </LongPressGestureHandler>
       </View>
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          Tap to flip • Swipe to next card
+          Tap to flip • Swipe to next card • Long press to delete
         </ThemedText>
       </View>
     </ThemedView>
@@ -723,5 +838,23 @@ const styles = StyleSheet.create({
   },
   currentCard: {
     zIndex: 2,
+  },
+  deleteOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(255, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    zIndex: 10,
+  },
+  deleteText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
   },
 });
