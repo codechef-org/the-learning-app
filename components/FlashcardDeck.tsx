@@ -367,7 +367,41 @@ export default function FlashcardDeck() {
       const shouldSwipe = Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold;
       
       if (shouldSwipe) {
-        nextCard();
+        // Check if card has been flipped before allowing swipe to next card
+        if (!isFlipped) {
+          // Card hasn't been flipped yet, show the back side instead of advancing
+          flipCard();
+          // Spring back to original position since we're not advancing
+          Animated.parallel([
+            Animated.spring(translateX, {
+              toValue: 0,
+              tension: 120,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+            Animated.spring(translateY, {
+              toValue: 0,
+              tension: 120,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+            Animated.spring(rotate, {
+              toValue: 0,
+              tension: 120,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+            Animated.spring(scale, {
+              toValue: 1,
+              tension: 120,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+          ]).start();
+        } else {
+          // Card has been flipped, allow advancing to next card
+          nextCard();
+        }
       } else {
         // Improved spring back animation
         Animated.parallel([
@@ -477,11 +511,30 @@ export default function FlashcardDeck() {
           <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
             {card.type.toUpperCase()}
           </ThemedText>
+          <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
+            ANSWER
+          </ThemedText>
           <ThemedText style={[styles.cardText, { color: textColor }]}>{cleanContent}</ThemedText>
         </View>
       );
     }
     
+    // Handle back side for all other card types
+    if (side === 'back') {
+      return (
+        <View style={styles.cardContent}>
+          <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
+            {card.type.toUpperCase()}
+          </ThemedText>
+          <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
+            ANSWER
+          </ThemedText>
+          <ThemedText style={[styles.cardText, { color: textColor }]}>{content}</ThemedText>
+        </View>
+      );
+    }
+    
+    // Front side (default case)
     return (
       <View style={styles.cardContent}>
         <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
@@ -655,7 +708,7 @@ export default function FlashcardDeck() {
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          Tap to flip • Swipe to next card • Long press to delete
+          Tap to flip • Flip first, then swipe to next card • Long press to delete
         </ThemedText>
       </View>
     </ThemedView>
@@ -753,6 +806,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  answerLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 16,
+    textAlign: 'center',
   },
   cardText: {
     fontSize: 18,
