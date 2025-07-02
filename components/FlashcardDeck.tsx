@@ -28,6 +28,24 @@ interface Flashcard {
   front: string;
   back: string;
   tags: string[];
+  // FSRS properties
+  state?: string;
+  due?: string;
+  stability?: number;
+  difficulty?: number;
+  elapsed_days?: number;
+  scheduled_days?: number;
+  reps?: number;
+  lapses?: number;
+  last_review?: string;
+  learning_steps?: number;
+}
+
+interface FlashcardStats {
+  due_today: number;
+  due_overdue: number;
+  new_cards: number;
+  total_reviews_today: number;
 }
 
 const CARD_WIDTH = screenWidth * 0.9;
@@ -41,6 +59,10 @@ export default function FlashcardDeck() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [stats, setStats] = useState<FlashcardStats | null>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [selectedRating, setSelectedRating] = useState<number | null>(null);
+  const [previewRating, setPreviewRating] = useState<number | null>(null);
   
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
@@ -57,6 +79,7 @@ export default function FlashcardDeck() {
   const rotate = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(1)).current;
   const deleteOpacity = useRef(new Animated.Value(0)).current;
+  const ratingOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (user) {
@@ -200,24 +223,40 @@ export default function FlashcardDeck() {
   const fetchFlashcards = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('flashcards')
-        .select('id, type, front, back, tags')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      
+      // First get stats to see if there are any cards due or available
+      const { data: statsData, error: statsError } = await supabase.functions
+        .invoke('flashcard-due', {
+          body: { stats_only: true }
+        });
 
-      if (error) throw error;
+      if (statsError) {
+        console.error('Error fetching stats:', statsError);
+      } else if (statsData?.stats) {
+        setStats(statsData.stats);
+      }
 
-      let flashcardData = data || [];
+      // Fetch due cards (including new cards)
+      const { data: dueData, error: dueError } = await supabase.functions
+        .invoke('flashcard-due', {
+          body: {
+            limit: 20,
+            include_new: true,
+            new_cards_limit: 5
+          }
+        });
+
+      if (dueError) throw dueError;
+
+      let flashcardData = dueData?.flashcards || [];
       
       // If no flashcards exist, use sample data for testing
       if (flashcardData.length === 0) {
         flashcardData = sampleFlashcards;
       }
 
-      const randomizedCards = shuffleArray([...flashcardData]);
-      setFlashcards(randomizedCards);
+      // Don't shuffle - cards are already prioritized by due date from FSRS
+      setFlashcards(flashcardData);
       setCurrentIndex(0);
       setIsFlipped(false);
       resetCardPosition();
@@ -239,18 +278,28 @@ export default function FlashcardDeck() {
     
     try {
       setLoadingMore(true);
-      const { data, error } = await supabase
-        .from('flashcards')
-        .select('id, type, front, back, tags')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false })
-        .range(flashcards.length, flashcards.length + 19);
+      
+      // For FSRS, we can fetch more cards but they might overlap with current ones
+      // This is acceptable for spaced repetition as cards get scheduled for future dates
+      const { data: dueData, error: dueError } = await supabase.functions
+        .invoke('flashcard-due', {
+          body: {
+            limit: 20,
+            include_new: true,
+            new_cards_limit: 15
+          }
+        });
 
-      if (error) throw error;
+      if (dueError) throw dueError;
 
-      if (data && data.length > 0) {
-        const randomizedNewCards = shuffleArray([...data]);
-        setFlashcards(prev => [...prev, ...randomizedNewCards]);
+      if (dueData?.flashcards && dueData.flashcards.length > 0) {
+        // Filter out cards we already have to avoid duplicates
+        const existingIds = new Set(flashcards.map(card => card.id));
+        const newCards = dueData.flashcards.filter((card: Flashcard) => !existingIds.has(card.id));
+        
+        if (newCards.length > 0) {
+          setFlashcards(prev => [...prev, ...newCards]);
+        }
       }
     } catch (error) {
       console.error('Error fetching more flashcards:', error);
@@ -283,10 +332,18 @@ export default function FlashcardDeck() {
     rotate.setValue(0);
     scale.setValue(1);
     flipValue.setValue(0);
+    ratingOpacity.setValue(0);
     setIsFlipped(false);
+    setPreviewRating(null);
+    setSelectedRating(null);
   };
 
   const nextCard = () => {
+    // Clear rating state immediately before starting transition
+    setPreviewRating(null);
+    setSelectedRating(null);
+    ratingOpacity.setValue(0);
+    
     // Animate current card out smoothly
     Animated.parallel([
       Animated.timing(translateX, {
@@ -317,6 +374,7 @@ export default function FlashcardDeck() {
         rotate.setValue(-5);
         scale.setValue(0.9);
         flipValue.setValue(0);
+        ratingOpacity.setValue(0); // Ensure rating overlay is hidden
         
         // Animate new card in smoothly
         Animated.parallel([
@@ -357,54 +415,80 @@ export default function FlashcardDeck() {
     const progress = Math.abs(translationX) / screenWidth;
     const scaleValue = 1 - (progress * 0.15); // Less aggressive scaling
     scale.setValue(Math.max(scaleValue, 0.85));
+    
+    // Show rating preview when card is flipped and swiping
+    if (isFlipped && !isReviewing) {
+      const rating = getRatingFromSwipe(translationX, translationY);
+      if (rating !== previewRating) {
+        setPreviewRating(rating);
+        if (rating) {
+          ratingOpacity.setValue(0.8);
+        } else {
+          ratingOpacity.setValue(0);
+        }
+      }
+    }
+  };
+
+  const getRatingFromSwipe = (translationX: number, translationY: number): number | null => {
+    const horizontalThreshold = screenWidth * 0.25;
+    const verticalThreshold = 100;
+    
+    // Left swipe = Again (1)
+    if (translationX < -horizontalThreshold) {
+      return 1; // Again
+    }
+    
+    // Right swipe variants
+    if (translationX > horizontalThreshold) {
+      if (translationY < -verticalThreshold) {
+        return 4; // Right + Up = Easy
+      } else if (translationY > verticalThreshold) {
+        return 2; // Right + Down = Hard  
+      } else {
+        return 3; // Right = Good
+      }
+    }
+    
+    return null; // No rating detected
+  };
+
+  const getRatingColor = (rating: number): string => {
+    switch (rating) {
+      case 1: return '#ef4444'; // Again - Red
+      case 2: return '#f97316'; // Hard - Orange  
+      case 3: return '#22c55e'; // Good - Green
+      case 4: return '#3b82f6'; // Easy - Blue
+      default: return tintColor;
+    }
+  };
+
+  const getRatingLabel = (rating: number): string => {
+    switch (rating) {
+      case 1: return 'Again';
+      case 2: return 'Hard';
+      case 3: return 'Good'; 
+      case 4: return 'Easy';
+      default: return '';
+    }
   };
 
   const onHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationX, velocityX } = event.nativeEvent;
+      const { translationX, translationY, velocityX } = event.nativeEvent;
       
-      const threshold = screenWidth * 0.25; // Lower threshold for easier swiping
-      const velocityThreshold = 800;
-      const shouldSwipe = Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold;
-      
-      if (shouldSwipe) {
-        // Check if card has been flipped before allowing swipe to next card
-        if (!isFlipped) {
-          // Card hasn't been flipped yet, show the back side instead of advancing
+      // Check if card has been flipped before allowing rating
+      if (!isFlipped) {
+        // Card hasn't been flipped yet, show the back side instead of rating
+        const threshold = screenWidth * 0.25;
+        const velocityThreshold = 800;
+        const shouldFlip = Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold;
+        
+        if (shouldFlip) {
           flipCard();
-          // Spring back to original position since we're not advancing
-          Animated.parallel([
-            Animated.spring(translateX, {
-              toValue: 0,
-              tension: 120,
-              friction: 7,
-              useNativeDriver: true,
-            }),
-            Animated.spring(translateY, {
-              toValue: 0,
-              tension: 120,
-              friction: 7,
-              useNativeDriver: true,
-            }),
-            Animated.spring(rotate, {
-              toValue: 0,
-              tension: 120,
-              friction: 7,
-              useNativeDriver: true,
-            }),
-            Animated.spring(scale, {
-              toValue: 1,
-              tension: 120,
-              friction: 7,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        } else {
-          // Card has been flipped, allow advancing to next card
-          nextCard();
         }
-      } else {
-        // Improved spring back animation
+        
+        // Spring back to original position since we're not rating yet
         Animated.parallel([
           Animated.spring(translateX, {
             toValue: 0,
@@ -430,7 +514,56 @@ export default function FlashcardDeck() {
             friction: 7,
             useNativeDriver: true,
           }),
+          Animated.timing(ratingOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
         ]).start();
+        setPreviewRating(null);
+        return;
+      }
+
+      // Card has been flipped, check for rating gestures
+      const rating = getRatingFromSwipe(translationX, translationY);
+      
+      if (rating && !isReviewing) {
+        // Valid rating detected, submit review
+        submitReview(rating);
+      } else {
+        // No valid rating or still processing, spring back
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            tension: 120,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(translateY, {
+            toValue: 0,
+            tension: 120,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(rotate, {
+            toValue: 0,
+            tension: 120,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scale, {
+            toValue: 1,
+            tension: 120,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.timing(ratingOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        setPreviewRating(null);
       }
     }
   };
@@ -555,13 +688,62 @@ export default function FlashcardDeck() {
     );
   }
 
+  const submitReview = async (rating: number) => {
+    if (!user || currentIndex >= flashcards.length || isReviewing) return;
+    
+    const currentCard = flashcards[currentIndex];
+    
+    // Skip review for sample cards
+    if (currentCard.id.startsWith('sample-')) {
+      nextCard();
+      return;
+    }
+    
+    try {
+      setIsReviewing(true);
+      setSelectedRating(rating);
+      
+      const reviewStartTime = Date.now();
+      
+      const { data: reviewData, error: reviewError } = await supabase.functions
+        .invoke('flashcard-review', {
+          body: {
+            flashcard_id: currentCard.id,
+            rating: rating, // 1=Again, 2=Hard, 3=Good, 4=Easy
+            review_duration_ms: Date.now() - reviewStartTime
+          }
+        });
+
+      if (reviewError) throw reviewError;
+
+      console.log('Review submitted:', {
+        rating,
+        next_review: reviewData?.next_review_date,
+        interval_days: reviewData?.interval_days
+      });
+
+      // Brief delay to show rating feedback, then advance
+      setTimeout(() => {
+        nextCard();
+      }, 600);
+      
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      Alert.alert(
+        'Review Error', 
+        'Failed to submit review. Please try again.',
+        [{ text: 'OK' }]
+      );
+      // Still advance to next card to avoid getting stuck
+      nextCard();
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
   const restartDeck = () => {
-    // Shuffle the cards for a fresh experience
-    const shuffledCards = shuffleArray([...flashcards]);
-    setFlashcards(shuffledCards);
-    setCurrentIndex(0);
-    setIsFlipped(false);
-    resetCardPosition();
+    // Refetch cards to get fresh due cards with FSRS prioritization
+    fetchFlashcards();
   };
 
   if (currentIndex >= flashcards.length) {
@@ -608,9 +790,16 @@ export default function FlashcardDeck() {
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <ThemedText style={[styles.counterText, { color: textColor, opacity: 0.7 }]}>
-          {currentIndex + 1} of {flashcards.length}
-        </ThemedText>
+        <View style={styles.headerLeft}>
+          <ThemedText style={[styles.counterText, { color: textColor, opacity: 0.7 }]}>
+            {currentIndex + 1} of {flashcards.length}
+          </ThemedText>
+          {stats && (
+            <ThemedText style={[styles.statsText, { color: textColor, opacity: 0.5 }]}>
+              Due: {stats.due_today + stats.due_overdue} • New: {stats.new_cards}
+            </ThemedText>
+          )}
+        </View>
         {loadingMore && (
           <ActivityIndicator size="small" color={tintColor} />
         )}
@@ -686,6 +875,28 @@ export default function FlashcardDeck() {
                     <ThemedText style={styles.deleteText}>🗑️ Release to Delete</ThemedText>
                   </Animated.View>
 
+                  {/* Rating overlay */}
+                  {(previewRating || selectedRating) && (
+                    <Animated.View
+                      style={[
+                        styles.ratingOverlay,
+                        {
+                          opacity: selectedRating ? 1 : ratingOpacity,
+                          backgroundColor: getRatingColor(previewRating || selectedRating || 3),
+                        },
+                      ]}
+                    >
+                      <ThemedText style={styles.ratingText}>
+                        {getRatingLabel(previewRating || selectedRating || 3)}
+                      </ThemedText>
+                      {selectedRating && (
+                        <ThemedText style={styles.ratingSubtext}>
+                          Review submitted!
+                        </ThemedText>
+                      )}
+                    </Animated.View>
+                  )}
+
                   {/* Front of card */}
                   <Animated.View
                     style={[
@@ -723,7 +934,10 @@ export default function FlashcardDeck() {
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          Tap to flip • Flip first, then swipe to next card • Long press to delete
+          Tap to flip • Then swipe: ← Again • ↘ Hard • → Good • ↗ Easy
+        </ThemedText>
+        <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.4 }]}>
+          Long press to delete
         </ThemedText>
       </View>
     </ThemedView>
@@ -770,9 +984,17 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     marginBottom: 20,
   },
+  headerLeft: {
+    flex: 1,
+  },
   counterText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  statsText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
   },
   cardContainer: {
     width: CARD_WIDTH,
@@ -851,6 +1073,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
+  instructionSubtext: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   clozeTextContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -885,6 +1112,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
+  },
+  ratingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    zIndex: 11,
+  },
+  ratingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  ratingSubtext: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 8,
+    opacity: 0.9,
   },
   restartButton: {
     marginTop: 32,

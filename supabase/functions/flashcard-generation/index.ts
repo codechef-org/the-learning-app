@@ -422,7 +422,7 @@ async function processChat(
   let flashcardsStored = 0
   for (const flashcard of flashcards) {
     try {
-      // Insert flashcard
+      // Insert flashcard with FSRS initialization
       const { data: newFlashcard, error: flashcardError } = await supabaseClient
         .from('flashcards')
         .insert({
@@ -431,6 +431,16 @@ async function processChat(
           front: flashcard.front,
           back: flashcard.back,
           tags: flashcard.tags,
+          // Initialize FSRS fields for new cards
+          state: 'NEW',
+          due: new Date().toISOString(),
+          stability: 0.4,
+          difficulty: 5.0,
+          elapsed_days: 0,
+          scheduled_days: 0,
+          reps: 0,
+          lapses: 0,
+          learning_steps: 0,
           created_at: new Date().toISOString()
         })
         .select('id')
