@@ -287,29 +287,30 @@ export default function FlashcardDeck() {
   };
 
   const nextCard = () => {
-    if (currentIndex < flashcards.length - 1) {
-      // Animate current card out smoothly
-      Animated.parallel([
-        Animated.timing(translateX, {
-          toValue: screenWidth * 1.2, // Move further off screen
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scale, {
-          toValue: 0.7,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(rotate, {
-          toValue: 20, // Add rotation for more dynamic exit
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Update to next card
-        setCurrentIndex(prev => prev + 1);
-        setIsFlipped(false);
-        
+    // Animate current card out smoothly
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: screenWidth * 1.2, // Move further off screen
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 0.7,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rotate, {
+        toValue: 20, // Add rotation for more dynamic exit
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Update to next card (or completion screen if this was the last card)
+      setCurrentIndex(prev => prev + 1);
+      setIsFlipped(false);
+      
+      // Only reset and animate in new card if there's a next card
+      if (currentIndex < flashcards.length - 1) {
         // Reset animation values instantly (off-screen)
         translateX.setValue(-screenWidth * 0.3); // Start from left side
         translateY.setValue(0);
@@ -338,8 +339,8 @@ export default function FlashcardDeck() {
             useNativeDriver: true,
           }),
         ]).start();
-      });
-    }
+      }
+    });
   };
 
   const onGestureEvent = (event: PanGestureHandlerGestureEvent) => {
@@ -554,6 +555,15 @@ export default function FlashcardDeck() {
     );
   }
 
+  const restartDeck = () => {
+    // Shuffle the cards for a fresh experience
+    const shuffledCards = shuffleArray([...flashcards]);
+    setFlashcards(shuffledCards);
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    resetCardPosition();
+  };
+
   if (currentIndex >= flashcards.length) {
     return (
       <ThemedView style={styles.completedContainer}>
@@ -561,6 +571,11 @@ export default function FlashcardDeck() {
         <ThemedText style={styles.completedText}>
           You&apos;ve reviewed all available flashcards. Great job!
         </ThemedText>
+        <TouchableWithoutFeedback onPress={restartDeck}>
+          <View style={[styles.restartButton, { backgroundColor: tintColor }]}>
+            <ThemedText style={[styles.restartButtonText, { color: backgroundColor }]}>🔄 Start Over</ThemedText>
+          </View>
+        </TouchableWithoutFeedback>
       </ThemedView>
     );
   }
@@ -870,5 +885,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
+  },
+  restartButton: {
+    marginTop: 32,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  restartButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
