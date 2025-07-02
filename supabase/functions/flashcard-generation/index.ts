@@ -421,10 +421,11 @@ async function generateFlashcardsWithAI(chat: any, messages: ChatMessage[]): Pro
 
 **Your Task:**
 1.  Analyze the provided conversation between a 'User' and an 'AI Tutor'.
-2.  **Decompose** all complex topics into their smallest logical, testable components. This is your primary goal. For example, instead of one card for "photosynthesis," create separate cards for its inputs, outputs, stages, and the definition of chlorophyll.
-3.  For each component, create a single flashcard in the most appropriate format. Choose from the types below.
-4.  Generate relevant topic tags for organization.
-5.  **AVOID:** Creating overly broad questions like "Summarize X" or "Explain everything about Y." These are ineffective for retrieval practice.
+2.  **Source-Grounding is Your Top Priority:** Every single flashcard (both the "front" and "back") must be derived *exclusively* from the information explicitly stated within the provided transcript. The answer to every question must be verifiable within the AI Tutor's messages.
+3.  **Do Not Introduce External Knowledge:** If a concept is only partially explained, create a flashcard only for the explained part. Do not use your own general knowledge to complete or add information that was not in the original discussion. Your role is to be a faithful extractor and formatter of the learned material.
+4.  **Decompose and Create:** After identifying a source-grounded concept, decompose it into its smallest logical, testable component and create a flashcard in the most appropriate format.
+5.  **Generate Topic Tags:** Create relevant tags based on the subject matter of the flashcard.
+6.  **AVOID:** Creating overly broad questions like "Summarize X" or "Explain everything about Y."
 
 **Flashcard Types:**
 *   **"qa":** For a standard Question/Answer. Ideal for cause-and-effect, "why," or "how" questions.
