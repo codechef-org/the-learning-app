@@ -476,6 +476,36 @@ Conversation Context:
 Conversation:
 ${conversation}`
 
+  // Define JSON schema for structured output
+  const flashcardSchema = {
+    type: "array",
+    items: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          enum: ["qa", "definition", "cloze"]
+        },
+        front: {
+          type: "string",
+          description: "The question, term, or sentence with cloze deletion"
+        },
+        back: {
+          type: "string", 
+          description: "The answer, definition, or complete sentence"
+        },
+        tags: {
+          type: "array",
+          items: {
+            type: "string"
+          },
+          description: "Relevant topic tags for categorization"
+        }
+      },
+      required: ["type", "front", "back", "tags"],
+    }
+  }
+
   try {
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -490,6 +520,7 @@ ${conversation}`
           ],
           generationConfig: {
             response_mime_type: 'application/json',
+            response_schema: flashcardSchema,
             temperature: 0.3, // Lower temperature for more consistent JSON output
             maxOutputTokens: 8192,
           },
@@ -529,30 +560,18 @@ ${conversation}`
 
     const aiResponse = geminiData.candidates[0].content.parts[0].text
     
-    // Parse JSON response
+    // Parse JSON response - with structured output, we're guaranteed correct format
     try {
-      const parsedJson = JSON.parse(aiResponse)
-      let flashcards: GeneratedFlashcard[];
-
-      if (Array.isArray(parsedJson)) {
-        flashcards = parsedJson;
-      } else if (parsedJson.flashcards && Array.isArray(parsedJson.flashcards)) {
-        flashcards = parsedJson.flashcards;
-      } else {
-        console.error('Invalid flashcard response format. Expected an array of flashcards or an object with a "flashcards" key.', aiResponse)
-        return []
-      }
+      const flashcards: GeneratedFlashcard[] = JSON.parse(aiResponse)
       
-      // Validate and filter flashcards
+      // Basic validation - structured output should handle most validation
       const validFlashcards = flashcards.filter(flashcard => {
-        return flashcard.type && 
-               flashcard.front && 
-               flashcard.back && 
-               ['qa', 'definition', 'cloze'].includes(flashcard.type.toLowerCase()) &&
-               flashcard.front.trim().length > 0 &&
-               flashcard.back.trim().length > 0
+        return flashcard.front?.trim().length > 0 &&
+               flashcard.back?.trim().length > 0 &&
+               Array.isArray(flashcard.tags)
       })
 
+      console.log(`Generated ${validFlashcards.length} valid flashcards from ${flashcards.length} total`)
       return validFlashcards
 
     } catch (parseError) {
