@@ -89,13 +89,15 @@ Deno.serve(async (req) => {
     const cronRunId = cronRun.id
     let totalChatsProcessed = 0
     let totalFlashcardsGenerated = 0
+    let hasCriticalFailures = false
 
     try {
       // 3. Get last processed timestamp
+      // Get the latest run that actually processed chats (regardless of final status)
       const { data: lastRun } = await supabaseClient
         .from('flashcard_cron_runs')
         .select('processed_up_to_timestamp')
-        .eq('status', 'completed')
+        .not('processed_up_to_timestamp', 'is', null)
         .order('start_time', { ascending: false })
         .limit(1)
         .maybeSingle()
@@ -109,7 +111,8 @@ Deno.serve(async (req) => {
       console.log(`Processing chats updated between ${lastProcessedTimestamp} and ${processingEndTime}`)
 
       // 5. Find eligible chats
-      const { data: eligibleChats, error: chatsError } = await supabaseClient
+      // 5a. Get chats updated in the current processing window
+      const { data: updatedChats, error: updatedChatsError } = await supabaseClient
         .from('chats')
         .select(`
           id, user_id, title, topic, updated_at,
@@ -118,9 +121,54 @@ Deno.serve(async (req) => {
         .gt('updated_at', lastProcessedTimestamp)
         .lte('updated_at', processingEndTime)
 
-      if (chatsError) {
-        throw new Error(`Failed to fetch eligible chats: ${chatsError.message}`)
+      if (updatedChatsError) {
+        throw new Error(`Failed to fetch updated chats: ${updatedChatsError.message}`)
       }
+
+      // 5b. Get chats that have failed processing records (to retry them)
+      // Only retry recent failures to avoid indefinite retries
+      const retryWindowHours = 24 // Retry failures from last 24 hours
+      const retryAfterTimestamp = new Date(Date.now() - retryWindowHours * 60 * 60 * 1000).toISOString()
+      
+      const { data: failedChatRecords, error: failedChatsError } = await supabaseClient
+        .from('flashcard_chat_processing')
+        .select('chat_id')
+        .eq('status', 'failed')
+        .gt('processed_at', retryAfterTimestamp)
+        .order('processed_at', { ascending: false })
+
+      if (failedChatsError) {
+        throw new Error(`Failed to fetch failed chat records: ${failedChatsError.message}`)
+      }
+
+      const failedChatIds = failedChatRecords?.map(record => record.chat_id) || []
+      let failedChats = []
+
+      if (failedChatIds.length > 0) {
+        const { data: failedChatsData, error: failedChatsDataError } = await supabaseClient
+          .from('chats')
+          .select(`
+            id, user_id, title, topic, updated_at,
+            messages!inner(id, created_at)
+          `)
+          .in('id', failedChatIds)
+
+        if (failedChatsDataError) {
+          throw new Error(`Failed to fetch failed chats data: ${failedChatsDataError.message}`)
+        }
+
+        failedChats = failedChatsData || []
+      }
+
+      // 5c. Combine and deduplicate chats
+      const allChats = [...(updatedChats || []), ...failedChats]
+      const uniqueChats = allChats.filter((chat, index, self) => 
+        index === self.findIndex(c => c.id === chat.id)
+      )
+
+      const eligibleChats = uniqueChats
+
+      console.log(`Found ${updatedChats?.length || 0} updated chats and ${failedChats.length} failed chats to retry (${eligibleChats.length} total unique chats)`)
 
       if (!eligibleChats || eligibleChats.length === 0) {
         console.log('No eligible chats found for processing')
@@ -160,41 +208,47 @@ Deno.serve(async (req) => {
         } catch (error) {
           console.error(`Error processing chat ${chat.id}:`, error)
           
-          // Record failed chat processing
-          await supabaseClient
-            .from('flashcard_chat_processing')
-            .insert({
-              cron_run_id: cronRunId,
-              chat_id: chat.id,
-              status: 'failed',
-              error_message: error.message,
-              flashcards_generated: 0,
-              processed_at: new Date().toISOString()
-            })
+          // Check if this is a critical failure (API-related)
+          if (error.message?.includes('API') || error.message?.includes('GEMINI')) {
+            hasCriticalFailures = true
+            console.error(`Critical API failure detected for chat ${chat.id}`)
+          }
+          
+          // Note: Failed chat processing record is now handled within processChat function
         }
       }
 
-      // 7. Update cron run as completed
+      // 7. Update cron run status based on whether there were critical failures
+      const finalStatus = hasCriticalFailures ? 'failed' : 'completed'
+      
+      // Always set processed_up_to_timestamp since we made progress through the processing window
+      // This prevents reprocessing the same time window even if some individual chats failed
       await supabaseClient
         .from('flashcard_cron_runs')
         .update({
           end_time: new Date().toISOString(),
           processed_up_to_timestamp: processingEndTime,
-          status: 'completed',
+          status: finalStatus,
           total_chats_processed: totalChatsProcessed,
-          total_flashcards_generated: totalFlashcardsGenerated
+          total_flashcards_generated: totalFlashcardsGenerated,
+          ...(hasCriticalFailures && { error_message: 'One or more chats failed due to API errors' })
         })
         .eq('id', cronRunId)
 
-      console.log(`Flashcard generation completed. Processed ${totalChatsProcessed} chats, generated ${totalFlashcardsGenerated} flashcards`)
+      const statusMessage = hasCriticalFailures 
+        ? 'Flashcard generation completed with failures'
+        : 'Flashcard generation completed successfully'
+
+      console.log(`${statusMessage}. Processed ${totalChatsProcessed} chats, generated ${totalFlashcardsGenerated} flashcards`)
 
       return new Response(
         JSON.stringify({ 
-          message: 'Flashcard generation completed successfully',
-          success: true,
+          message: statusMessage,
+          success: !hasCriticalFailures,
           stats: {
             chatsProcessed: totalChatsProcessed,
-            flashcardsGenerated: totalFlashcardsGenerated
+            flashcardsGenerated: totalFlashcardsGenerated,
+            hasCriticalFailures
           }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -231,6 +285,22 @@ Deno.serve(async (req) => {
   }
 })
 
+// Helper function to clean up old failed records for a chat
+async function cleanupFailedRecords(supabaseClient: any, chatId: string, currentProcessingId: string) {
+  const { data: deletedFailedRecords, error: deleteError } = await supabaseClient
+    .from('flashcard_chat_processing')
+    .delete()
+    .eq('chat_id', chatId)
+    .eq('status', 'failed')
+    .neq('id', currentProcessingId) // Don't delete the current record
+
+  if (deleteError) {
+    console.warn(`Warning: Failed to clean up old failed records for chat ${chatId}:`, deleteError.message)
+  } else if (deletedFailedRecords && deletedFailedRecords.length > 0) {
+    console.log(`Cleaned up ${deletedFailedRecords.length} old failed record(s) for chat ${chatId}`)
+  }
+}
+
 async function processChat(
   supabaseClient: any,
   chat: any,
@@ -254,6 +324,8 @@ async function processChat(
   if (processingError) {
     throw new Error(`Failed to create chat processing record: ${processingError.message}`)
   }
+
+  try {
 
   // 2. Get last processed message for this chat
   const { data: lastProcessedMessage } = await supabaseClient
@@ -296,6 +368,9 @@ async function processChat(
       })
       .eq('id', chatProcessing.id)
     
+    // Clean up any old failed records since this chat was successfully processed (skipped)
+    await cleanupFailedRecords(supabaseClient, chat.id, chatProcessing.id)
+    
     console.log(`Skipped chat ${chat.id}: insufficient messages (${messages.length})`)
     return 0
   }
@@ -315,6 +390,9 @@ async function processChat(
       })
       .eq('id', chatProcessing.id)
     
+    // Clean up any old failed records since this chat was successfully processed (skipped)
+    await cleanupFailedRecords(supabaseClient, chat.id, chatProcessing.id)
+    
     console.log(`Skipped chat ${chat.id}: insufficient user-assistant interaction`)
     return 0
   }
@@ -332,6 +410,9 @@ async function processChat(
         processed_at: new Date().toISOString()
       })
       .eq('id', chatProcessing.id)
+    
+    // Clean up any old failed records since this chat was successfully processed
+    await cleanupFailedRecords(supabaseClient, chat.id, chatProcessing.id)
     
     console.log(`No flashcards generated for chat ${chat.id}`)
     return 0
@@ -393,8 +474,28 @@ async function processChat(
     })
     .eq('id', chatProcessing.id)
 
+  // 8. Clean up any old failed records for this chat (successful retry)
+  await cleanupFailedRecords(supabaseClient, chat.id, chatProcessing.id)
+
   console.log(`Generated ${flashcardsStored} flashcards for chat ${chat.id}`)
   return flashcardsStored
+
+  } catch (error) {
+    // Update the existing processing record to failed
+    await supabaseClient
+      .from('flashcard_chat_processing')
+      .update({
+        status: 'failed',
+        error_message: error.message,
+        flashcards_generated: 0,
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', chatProcessing.id)
+
+    console.error(`Failed to process chat ${chat.id}:`, error)
+    // Re-throw the error so the main loop can track critical failures
+    throw error
+  }
 }
 
 async function generateFlashcardsWithAI(chat: any, messages: ChatMessage[]): Promise<GeneratedFlashcard[]> {
@@ -577,11 +678,12 @@ ${conversation}`
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError)
       console.error('AI Response:', aiResponse)
-      return []
+      throw new Error(`Gemini API returned invalid JSON response: ${parseError.message}`)
     }
 
   } catch (error) {
     console.error('Error calling Gemini API:', error)
-    return []
+    // Re-throw API errors to be handled as critical failures
+    throw new Error(`Gemini API call failed: ${error.message}`)
   }
 }
