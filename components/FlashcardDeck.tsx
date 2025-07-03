@@ -440,21 +440,27 @@ export default function FlashcardDeck() {
 
   const getRatingFromSwipe = (translationX: number, translationY: number): number | null => {
     const horizontalThreshold = screenWidth * 0.25;
-    const verticalThreshold = 100;
+    const verticalThreshold = screenHeight * 0.15;
     
-    // Left swipe = Again (1)
-    if (translationX < -horizontalThreshold) {
-      return 1; // Again
-    }
+    // Prioritize the direction with more movement
+    const absX = Math.abs(translationX);
+    const absY = Math.abs(translationY);
     
-    // Right swipe variants
-    if (translationX > horizontalThreshold) {
-      if (translationY < -verticalThreshold) {
-        return 4; // Right + Up = Easy
-      } else if (translationY > verticalThreshold) {
-        return 2; // Right + Down = Hard  
+    if (absX > horizontalThreshold || absY > verticalThreshold) {
+      if (absX > absY) {
+        // Horizontal movement is dominant
+        if (translationX < 0) {
+          return 1; // Left = Again
+        } else {
+          return 3; // Right = Good
+        }
       } else {
-        return 3; // Right = Good
+        // Vertical movement is dominant
+        if (translationY < 0) {
+          return 4; // Up = Easy
+        } else {
+          return 2; // Down = Hard
+        }
       }
     }
     
@@ -942,7 +948,7 @@ export default function FlashcardDeck() {
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          Tap to flip • Then swipe: ← Again • ↘ Hard • → Good • ↗ Easy
+          Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.4 }]}>
           Long press to delete
