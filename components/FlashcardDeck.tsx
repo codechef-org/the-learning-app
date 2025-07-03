@@ -63,6 +63,7 @@ export default function FlashcardDeck() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [previewRating, setPreviewRating] = useState<number | null>(null);
+  const [hasSeenAnswer, setHasSeenAnswer] = useState(false);
   
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
@@ -324,6 +325,11 @@ export default function FlashcardDeck() {
       useNativeDriver: true,
     }).start();
     setIsFlipped(!isFlipped);
+    
+    // Mark that user has seen the answer when flipping to back
+    if (!isFlipped) {
+      setHasSeenAnswer(true);
+    }
   };
 
   const resetCardPosition = () => {
@@ -336,6 +342,7 @@ export default function FlashcardDeck() {
     setIsFlipped(false);
     setPreviewRating(null);
     setSelectedRating(null);
+    setHasSeenAnswer(false);
   };
 
   const nextCard = () => {
@@ -365,6 +372,7 @@ export default function FlashcardDeck() {
       // Update to next card (or completion screen if this was the last card)
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
+      setHasSeenAnswer(false);
       
       // Only reset and animate in new card if there's a next card
       if (currentIndex < flashcards.length - 1) {
@@ -416,8 +424,8 @@ export default function FlashcardDeck() {
     const scaleValue = 1 - (progress * 0.15); // Less aggressive scaling
     scale.setValue(Math.max(scaleValue, 0.85));
     
-    // Show rating preview when card is flipped and swiping
-    if (isFlipped && !isReviewing) {
+    // Show rating preview when user has seen answer and swiping
+    if (hasSeenAnswer && !isReviewing) {
       const rating = getRatingFromSwipe(translationX, translationY);
       if (rating !== previewRating) {
         setPreviewRating(rating);
@@ -477,9 +485,9 @@ export default function FlashcardDeck() {
     if (event.nativeEvent.state === State.END) {
       const { translationX, translationY, velocityX } = event.nativeEvent;
       
-      // Check if card has been flipped before allowing rating
-      if (!isFlipped) {
-        // Card hasn't been flipped yet, show the back side instead of rating
+      // Check if user has seen the answer before allowing rating
+      if (!hasSeenAnswer) {
+        // User hasn't seen the answer yet, show the back side instead of rating
         const threshold = screenWidth * 0.25;
         const velocityThreshold = 800;
         const shouldFlip = Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold;
@@ -524,7 +532,7 @@ export default function FlashcardDeck() {
         return;
       }
 
-      // Card has been flipped, check for rating gestures
+      // User has seen the answer, check for rating gestures
       const rating = getRatingFromSwipe(translationX, translationY);
       
       if (rating && !isReviewing) {
