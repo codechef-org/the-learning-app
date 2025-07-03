@@ -3,19 +3,19 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  StyleSheet,
-  TouchableWithoutFeedback,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    StyleSheet,
+    TouchableWithoutFeedback,
+    View
 } from 'react-native';
 import {
-  LongPressGestureHandler,
-  PanGestureHandler,
-  PanGestureHandlerGestureEvent,
-  State
+    LongPressGestureHandler,
+    PanGestureHandler,
+    PanGestureHandlerGestureEvent,
+    State
 } from 'react-native-gesture-handler';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
@@ -420,16 +420,48 @@ export default function FlashcardDeck() {
     setHasSeenAnswer(false);
   }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations]);
 
-  const nextCard = useCallback(() => {
+  const nextCard = useCallback((rating?: number) => {
     // Clear rating state immediately before starting transition
     setPreviewRating(null);
     setSelectedRating(null);
     ratingOpacity.setValue(0);
     
+    // Determine exit direction based on rating
+    let exitTranslateX = screenWidth * 1.2; // Default: right
+    let exitTranslateY = 0;
+    let exitRotation = 20; // Default: slight right rotation
+    
+    if (rating) {
+      switch (rating) {
+        case 1: // Again (Left swipe)
+          exitTranslateX = -screenWidth * 1.2; // Exit left
+          exitRotation = -20; // Rotate left
+          break;
+        case 2: // Hard (Down swipe)
+          exitTranslateX = screenWidth * 0.3; // Slight right drift
+          exitTranslateY = screenHeight * 0.8; // Exit down
+          exitRotation = 10;
+          break;
+        case 3: // Good (Right swipe)
+          exitTranslateX = screenWidth * 1.2; // Exit right
+          exitRotation = 20; // Rotate right
+          break;
+        case 4: // Easy (Up swipe)
+          exitTranslateX = -screenWidth * 0.3; // Slight left drift
+          exitTranslateY = -screenHeight * 0.8; // Exit up
+          exitRotation = -10;
+          break;
+      }
+    }
+    
     // Create exit animation
     const exitAnimation = Animated.parallel([
       Animated.timing(translateX, {
-        toValue: screenWidth * 1.2,
+        toValue: exitTranslateX,
+        ...ANIMATION_CONFIG.TIMING_MEDIUM,
+      }),
+      Animated.timing(translateY, {
+        toValue: exitTranslateY,
         ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
       Animated.timing(scale, {
@@ -437,7 +469,7 @@ export default function FlashcardDeck() {
         ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
       Animated.timing(rotate, {
-        toValue: 20,
+        toValue: exitRotation,
         ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
     ]);
@@ -664,7 +696,7 @@ export default function FlashcardDeck() {
         
         // Skip review for sample cards
         if (currentCard.id.startsWith('sample-')) {
-          nextCard();
+          nextCard(rating);
           return;
         }
         
@@ -673,7 +705,7 @@ export default function FlashcardDeck() {
         
         // Show rating feedback briefly, then advance immediately
         setTimeout(() => {
-          nextCard();
+          nextCard(rating);
         }, 100);
         
         // Make the API call in the background
@@ -892,7 +924,7 @@ export default function FlashcardDeck() {
     
     // Skip review for sample cards
     if (currentCard.id.startsWith('sample-')) {
-      nextCard();
+      nextCard(rating);
       return;
     }
     
@@ -902,7 +934,7 @@ export default function FlashcardDeck() {
       
       // Show rating feedback briefly, then advance immediately (optimistic update)
       setTimeout(() => {
-        nextCard();
+        nextCard(rating);
       }, 100); // Reduced delay for faster feedback
       
       // Make the API call in the background (non-blocking)
@@ -946,7 +978,7 @@ export default function FlashcardDeck() {
     } catch (error) {
       console.error('Error in submitReview:', error);
       // Even if there's an immediate error, still advance to prevent getting stuck
-      nextCard();
+      nextCard(rating);
     } finally {
       setIsReviewing(false);
     }
