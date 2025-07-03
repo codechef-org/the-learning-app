@@ -717,38 +717,52 @@ export default function FlashcardDeck() {
       setIsReviewing(true);
       setSelectedRating(rating);
       
+      // Show rating feedback briefly, then advance immediately (optimistic update)
+      setTimeout(() => {
+        nextCard();
+      }, 100); // Reduced delay for faster feedback
+      
+      // Make the API call in the background (non-blocking)
       const reviewStartTime = Date.now();
       
-      const { data: reviewData, error: reviewError } = await supabase.functions
+      // Don't await this - let it happen in background
+      supabase.functions
         .invoke('flashcard-review', {
           body: {
             flashcard_id: currentCard.id,
             rating: rating, // 1=Again, 2=Hard, 3=Good, 4=Easy
             review_duration_ms: Date.now() - reviewStartTime
           }
+        })
+        .then(({ data: reviewData, error: reviewError }) => {
+          if (reviewError) {
+            console.error('Background review submission failed:', reviewError);
+            Alert.alert(
+              'Review Failed',
+              'Failed to save your review. Your progress may not be saved.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          
+          console.log('Review submitted:', {
+            rating,
+            next_review: reviewData?.next_review_date,
+            interval_days: reviewData?.interval_days
+          });
+        })
+        .catch((error) => {
+          console.error('Background review submission error:', error);
+          Alert.alert(
+            'Network Error',
+            'Unable to save your review due to network issues. Please check your connection.',
+            [{ text: 'OK' }]
+          );
         });
-
-      if (reviewError) throw reviewError;
-
-      console.log('Review submitted:', {
-        rating,
-        next_review: reviewData?.next_review_date,
-        interval_days: reviewData?.interval_days
-      });
-
-      // Brief delay to show rating feedback, then advance
-      setTimeout(() => {
-        nextCard();
-      }, 600);
-      
+        
     } catch (error) {
-      console.error('Error submitting review:', error);
-      Alert.alert(
-        'Review Error', 
-        'Failed to submit review. Please try again.',
-        [{ text: 'OK' }]
-      );
-      // Still advance to next card to avoid getting stuck
+      console.error('Error in submitReview:', error);
+      // Even if there's an immediate error, still advance to prevent getting stuck
       nextCard();
     } finally {
       setIsReviewing(false);
