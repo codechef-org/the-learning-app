@@ -1,7 +1,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -51,6 +51,32 @@ interface FlashcardStats {
 const CARD_WIDTH = screenWidth * 0.9;
 const CARD_HEIGHT = screenHeight * 0.6;
 
+// Animation constants for consistency
+const ANIMATION_CONFIG = {
+  SPRING_DEFAULT: {
+    tension: 120,
+    friction: 7,
+    useNativeDriver: true,
+  },
+  SPRING_FAST: {
+    tension: 150,
+    friction: 8,
+    useNativeDriver: true,
+  },
+  TIMING_FAST: {
+    duration: 200,
+    useNativeDriver: true,
+  },
+  TIMING_MEDIUM: {
+    duration: 400,
+    useNativeDriver: true,
+  },
+  TIMING_SLOW: {
+    duration: 600,
+    useNativeDriver: true,
+  },
+} as const;
+
 export default function FlashcardDeck() {
   const { user } = useAuth();
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
@@ -81,6 +107,66 @@ export default function FlashcardDeck() {
   const scale = useRef(new Animated.Value(1)).current;
   const deleteOpacity = useRef(new Animated.Value(0)).current;
   const ratingOpacity = useRef(new Animated.Value(0)).current;
+
+  // Animation cleanup
+  const animationRefs = useRef<Animated.CompositeAnimation[]>([]);
+  
+  const stopAllAnimations = useCallback(() => {
+    animationRefs.current.forEach(animation => animation.stop());
+    animationRefs.current = [];
+  }, []);
+
+  const addAnimation = useCallback((animation: Animated.CompositeAnimation) => {
+    animationRefs.current.push(animation);
+    return animation;
+  }, []);
+
+  // Optimized animation functions
+  const createSpringToPosition = useCallback((
+    values: { x?: number; y?: number; scale?: number; rotate?: number },
+    config: typeof ANIMATION_CONFIG.SPRING_DEFAULT | typeof ANIMATION_CONFIG.SPRING_FAST = ANIMATION_CONFIG.SPRING_DEFAULT
+  ) => {
+    const animations = [];
+    
+    if (values.x !== undefined) {
+      animations.push(Animated.spring(translateX, { toValue: values.x, ...config }));
+    }
+    if (values.y !== undefined) {
+      animations.push(Animated.spring(translateY, { toValue: values.y, ...config }));
+    }
+    if (values.scale !== undefined) {
+      animations.push(Animated.spring(scale, { toValue: values.scale, ...config }));
+    }
+    if (values.rotate !== undefined) {
+      animations.push(Animated.spring(rotate, { toValue: values.rotate, ...config }));
+    }
+    
+    return Animated.parallel(animations);
+  }, [translateX, translateY, scale, rotate]);
+
+  const createTimingAnimation = useCallback((
+    values: { opacity?: number; duration?: number },
+    config = ANIMATION_CONFIG.TIMING_FAST
+  ) => {
+    const animations = [];
+    
+    if (values.opacity !== undefined) {
+      animations.push(Animated.timing(ratingOpacity, { 
+        toValue: values.opacity, 
+        duration: values.duration || config.duration,
+        useNativeDriver: true
+      }));
+    }
+    
+    return animations.length === 1 ? animations[0] : Animated.parallel(animations);
+  }, [ratingOpacity]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAllAnimations();
+    };
+  }, [stopAllAnimations]);
 
   useEffect(() => {
     if (user) {
@@ -163,31 +249,31 @@ export default function FlashcardDeck() {
     );
   };
 
-  const onLongPressStateChange = (event: any) => {
+  const onLongPressStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.ACTIVE) {
       // Visual feedback for long press
-      Animated.timing(deleteOpacity, {
+      const showDeleteAnimation = Animated.timing(deleteOpacity, {
         toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+        ...ANIMATION_CONFIG.TIMING_FAST,
+      });
+      addAnimation(showDeleteAnimation).start();
     } else if (event.nativeEvent.state === State.END) {
       // Hide visual feedback and trigger delete
-      Animated.timing(deleteOpacity, {
+      const hideDeleteAnimation = Animated.timing(deleteOpacity, {
         toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+        ...ANIMATION_CONFIG.TIMING_FAST,
+      });
+      addAnimation(hideDeleteAnimation).start();
       handleLongPress();
     } else if (event.nativeEvent.state === State.CANCELLED || event.nativeEvent.state === State.FAILED) {
       // Hide visual feedback
-      Animated.timing(deleteOpacity, {
+      const hideDeleteAnimation = Animated.timing(deleteOpacity, {
         toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+        ...ANIMATION_CONFIG.TIMING_FAST,
+      });
+      addAnimation(hideDeleteAnimation).start();
     }
-  };
+  }, [deleteOpacity, addAnimation, handleLongPress]);
 
   // Sample flashcards for testing
   const sampleFlashcards: Flashcard[] = [
@@ -318,57 +404,63 @@ export default function FlashcardDeck() {
     return shuffled;
   };
 
-  const flipCard = () => {
-    Animated.timing(flipValue, {
+  const flipCard = useCallback(() => {
+    const animation = Animated.timing(flipValue, {
       toValue: isFlipped ? 0 : 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
+      ...ANIMATION_CONFIG.TIMING_SLOW,
+    });
+    
+    addAnimation(animation).start();
     setIsFlipped(!isFlipped);
     
     // Mark that user has seen the answer when flipping to back
     if (!isFlipped) {
       setHasSeenAnswer(true);
     }
-  };
+  }, [isFlipped, flipValue, addAnimation]);
 
-  const resetCardPosition = () => {
+  const resetCardPosition = useCallback(() => {
+    // Stop any running animations first
+    stopAllAnimations();
+    
+    // Reset values instantly for immediate feedback
     translateX.setValue(0);
     translateY.setValue(0);
     rotate.setValue(0);
     scale.setValue(1);
     flipValue.setValue(0);
     ratingOpacity.setValue(0);
+    
+    // Reset state
     setIsFlipped(false);
     setPreviewRating(null);
     setSelectedRating(null);
     setHasSeenAnswer(false);
-  };
+  }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations]);
 
-  const nextCard = () => {
+  const nextCard = useCallback(() => {
     // Clear rating state immediately before starting transition
     setPreviewRating(null);
     setSelectedRating(null);
     ratingOpacity.setValue(0);
     
-    // Animate current card out smoothly
-    Animated.parallel([
+    // Create exit animation
+    const exitAnimation = Animated.parallel([
       Animated.timing(translateX, {
-        toValue: screenWidth * 1.2, // Move further off screen
-        duration: 400,
-        useNativeDriver: true,
+        toValue: screenWidth * 1.2,
+        ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
       Animated.timing(scale, {
         toValue: 0.7,
-        duration: 400,
-        useNativeDriver: true,
+        ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
       Animated.timing(rotate, {
-        toValue: 20, // Add rotation for more dynamic exit
-        duration: 400,
-        useNativeDriver: true,
+        toValue: 20,
+        ...ANIMATION_CONFIG.TIMING_MEDIUM,
       }),
-    ]).start(() => {
+    ]);
+    
+    addAnimation(exitAnimation).start(() => {
       // Update to next card (or completion screen if this was the last card)
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
@@ -377,66 +469,132 @@ export default function FlashcardDeck() {
       // Only reset and animate in new card if there's a next card
       if (currentIndex < flashcards.length - 1) {
         // Reset animation values instantly (off-screen)
-        translateX.setValue(-screenWidth * 0.3); // Start from left side
+        translateX.setValue(-screenWidth * 0.3);
         translateY.setValue(0);
         rotate.setValue(-5);
         scale.setValue(0.9);
         flipValue.setValue(0);
-        ratingOpacity.setValue(0); // Ensure rating overlay is hidden
+        ratingOpacity.setValue(0);
         
-        // Animate new card in smoothly
-        Animated.parallel([
-          Animated.spring(translateX, {
-            toValue: 0,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-          Animated.spring(rotate, {
-            toValue: 0,
-            tension: 100,
-            friction: 8,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        // Create entrance animation
+        const entranceAnimation = createSpringToPosition(
+          { x: 0, scale: 1, rotate: 0 },
+          ANIMATION_CONFIG.SPRING_FAST
+        );
+        
+        addAnimation(entranceAnimation).start();
       }
     });
-  };
+  }, [
+    currentIndex,
+    flashcards.length,
+    ratingOpacity,
+    translateX,
+    translateY,
+    rotate,
+    scale,
+    flipValue,
+    addAnimation,
+    createSpringToPosition
+  ]);
 
-  const onGestureEvent = (event: PanGestureHandlerGestureEvent) => {
+  // Memoize rating thresholds for performance
+  const ratingThresholds = useMemo(() => ({
+    horizontal: screenWidth * 0.25,
+    vertical: screenHeight * 0.15,
+  }), []);
+
+  // Memoize gesture thresholds
+  const gestureThresholds = useMemo(() => ({
+    position: screenWidth * 0.25,
+    velocity: 800,
+  }), []);
+
+  // Memoized interpolated styles for the flip animation
+  const frontAnimatedStyle = useMemo(() => ({
+    transform: [
+      {
+        rotateY: flipValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '180deg'],
+        }),
+      },
+    ],
+  }), [flipValue]);
+
+  const backAnimatedStyle = useMemo(() => ({
+    transform: [
+      {
+        rotateY: flipValue.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['180deg', '360deg'],
+        }),
+      },
+    ],
+  }), [flipValue]);
+
+  // Memoized next card preview transform for performance
+  const nextCardTransform = useMemo(() => [
+    { scale: 0.95 }, 
+    { translateY: 10 },
+    { 
+      translateX: translateX.interpolate({
+        inputRange: [-screenWidth, 0, screenWidth],
+        outputRange: [5, 0, -5],
+        extrapolate: 'clamp',
+      })
+    },
+  ], [translateX]);
+
+  // Optimized gesture event handler
+  const onGestureEvent = useCallback((event: PanGestureHandlerGestureEvent) => {
     const { translationX, translationY } = event.nativeEvent;
     
+    // Use native driver for smooth gesture tracking
     translateX.setValue(translationX);
     translateY.setValue(translationY);
     
-    // More dynamic rotation based on swipe direction and distance
-    const rotateValue = translationX / 8; // Reduced for subtler rotation
+    // Optimized rotation calculation
+    const rotateValue = translationX * 0.125; // More efficient than division
     rotate.setValue(rotateValue);
     
-    // Smooth scale transition with better curve
+    // Optimized scale calculation with clamping
     const progress = Math.abs(translationX) / screenWidth;
-    const scaleValue = 1 - (progress * 0.15); // Less aggressive scaling
-    scale.setValue(Math.max(scaleValue, 0.85));
+    const scaleValue = Math.max(1 - (progress * 0.15), 0.85);
+    scale.setValue(scaleValue);
     
-    // Show rating preview when user has seen answer and swiping
+    // Throttled rating preview updates (only when needed)
     if (hasSeenAnswer && !isReviewing) {
-      const rating = getRatingFromSwipe(translationX, translationY);
-      if (rating !== previewRating) {
-        setPreviewRating(rating);
-        if (rating) {
-          ratingOpacity.setValue(0.8);
+      const absX = Math.abs(translationX);
+      const absY = Math.abs(translationY);
+      
+      let newRating: number | null = null;
+      
+      if (absX > ratingThresholds.horizontal || absY > ratingThresholds.vertical) {
+        if (absX > absY) {
+          newRating = translationX < 0 ? 1 : 3; // Left = Again, Right = Good
         } else {
-          ratingOpacity.setValue(0);
+          newRating = translationY < 0 ? 4 : 2; // Up = Easy, Down = Hard
         }
       }
+      
+      // Only update if rating changed to prevent unnecessary re-renders
+      if (newRating !== previewRating) {
+        setPreviewRating(newRating);
+        ratingOpacity.setValue(newRating ? 0.8 : 0);
+      }
     }
-  };
+  }, [
+    translateX,
+    translateY,
+    rotate,
+    scale,
+    ratingOpacity,
+    hasSeenAnswer,
+    isReviewing,
+    previewRating,
+    ratingThresholds
+  ]);
 
   const getRatingFromSwipe = (translationX: number, translationY: number): number | null => {
     const horizontalThreshold = screenWidth * 0.25;
@@ -487,53 +645,27 @@ export default function FlashcardDeck() {
     }
   };
 
-  const onHandlerStateChange = (event: PanGestureHandlerGestureEvent) => {
+  const onHandlerStateChange = useCallback((event: PanGestureHandlerGestureEvent) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX, translationY, velocityX } = event.nativeEvent;
       
       // Check if user has seen the answer before allowing rating
       if (!hasSeenAnswer) {
         // User hasn't seen the answer yet, show the back side instead of rating
-        const threshold = screenWidth * 0.25;
-        const velocityThreshold = 800;
-        const shouldFlip = Math.abs(translationX) > threshold || Math.abs(velocityX) > velocityThreshold;
+        const shouldFlip = Math.abs(translationX) > gestureThresholds.position || 
+                          Math.abs(velocityX) > gestureThresholds.velocity;
         
         if (shouldFlip) {
           flipCard();
         }
         
-        // Spring back to original position since we're not rating yet
-        Animated.parallel([
-          Animated.spring(translateX, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(translateY, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(rotate, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.timing(ratingOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        // Spring back to original position using optimized function
+        const springBackAnimation = Animated.parallel([
+          createSpringToPosition({ x: 0, y: 0, rotate: 0, scale: 1 }, ANIMATION_CONFIG.SPRING_DEFAULT),
+          createTimingAnimation({ opacity: 0 }),
+        ]);
+        
+        addAnimation(springBackAnimation).start();
         setPreviewRating(null);
         return;
       }
@@ -543,44 +675,67 @@ export default function FlashcardDeck() {
       
       if (rating && !isReviewing) {
         // Valid rating detected, submit review
-        submitReview(rating);
+        // Call submitReview directly to avoid dependency issues
+        if (!user || currentIndex >= flashcards.length || isReviewing) return;
+        
+        const currentCard = flashcards[currentIndex];
+        
+        // Skip review for sample cards
+        if (currentCard.id.startsWith('sample-')) {
+          nextCard();
+          return;
+        }
+        
+        setIsReviewing(true);
+        setSelectedRating(rating);
+        
+        // Show rating feedback briefly, then advance immediately
+        setTimeout(() => {
+          nextCard();
+        }, 100);
+        
+        // Make the API call in the background
+        const reviewStartTime = Date.now();
+        
+        supabase.functions
+          .invoke('flashcard-review', {
+            body: {
+              flashcard_id: currentCard.id,
+              rating: rating,
+              review_duration_ms: Date.now() - reviewStartTime
+            }
+          })
+          .catch((error) => {
+            console.error('Background review submission error:', error);
+          })
+          .finally(() => {
+            setIsReviewing(false);
+          });
       } else {
         // No valid rating or still processing, spring back
-        Animated.parallel([
-          Animated.spring(translateX, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(translateY, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(rotate, {
-            toValue: 0,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.spring(scale, {
-            toValue: 1,
-            tension: 120,
-            friction: 7,
-            useNativeDriver: true,
-          }),
-          Animated.timing(ratingOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ]).start();
+        const springBackAnimation = Animated.parallel([
+          createSpringToPosition({ x: 0, y: 0, rotate: 0, scale: 1 }, ANIMATION_CONFIG.SPRING_DEFAULT),
+          createTimingAnimation({ opacity: 0 }),
+        ]);
+        
+        addAnimation(springBackAnimation).start();
         setPreviewRating(null);
       }
     }
-  };
+  }, [
+    hasSeenAnswer,
+    gestureThresholds,
+    flipCard,
+    createSpringToPosition,
+    createTimingAnimation,
+    addAnimation,
+    getRatingFromSwipe,
+    isReviewing,
+    user,
+    currentIndex,
+    flashcards,
+    nextCard
+  ]);
 
   const renderFlashcardContent = (card: Flashcard, side: 'front' | 'back') => {
     const content = side === 'front' ? card.front : card.back;
@@ -791,29 +946,6 @@ export default function FlashcardDeck() {
   }
 
   const currentCard = flashcards[currentIndex];
-  
-  // Create interpolated styles for the flip animation
-  const frontAnimatedStyle = {
-    transform: [
-      {
-        rotateY: flipValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['0deg', '180deg'],
-        }),
-      },
-    ],
-  };
-
-  const backAnimatedStyle = {
-    transform: [
-      {
-        rotateY: flipValue.interpolate({
-          inputRange: [0, 1],
-          outputRange: ['180deg', '360deg'],
-        }),
-      },
-    ],
-  };
 
   return (
     <ThemedView style={styles.container}>
@@ -844,17 +976,7 @@ export default function FlashcardDeck() {
                   backgroundColor: cardFrontColor,
                   shadowColor: shadowColor,
                   opacity: 0.2,
-                  transform: [
-                    { scale: 0.95 }, 
-                    { translateY: 10 },
-                    { 
-                      translateX: translateX.interpolate({
-                        inputRange: [-screenWidth, 0, screenWidth],
-                        outputRange: [5, 0, -5],
-                        extrapolate: 'clamp',
-                      })
-                    },
-                  ],
+                  transform: nextCardTransform,
                 },
               ]}
             >
