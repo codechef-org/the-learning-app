@@ -46,6 +46,7 @@ interface FlashcardStats {
   due_overdue: number;
   new_cards: number;
   total_reviews_today: number;
+  next_due_date?: string;
 }
 
 const CARD_WIDTH = screenWidth * 0.9;
@@ -275,37 +276,7 @@ export default function FlashcardDeck() {
     }
   }, [deleteOpacity, addAnimation, handleLongPress]);
 
-  // Sample flashcards for testing
-  const sampleFlashcards: Flashcard[] = [
-    {
-      id: 'sample-1',
-      type: 'qa',
-      front: 'What is the capital of France?',
-      back: 'Paris',
-      tags: ['geography', 'europe'],
-    },
-    {
-      id: 'sample-2',
-      type: 'definition',
-      front: 'React Native',
-      back: 'A framework for building mobile applications using React and JavaScript',
-      tags: ['programming', 'mobile', 'react'],
-    },
-    {
-      id: 'sample-3',
-      type: 'cloze',
-      front: 'The {{c1::mitochondria}} is known as the {{c2::powerhouse}} of the cell.',
-      back: 'The mitochondria is known as the powerhouse of the cell.',
-      tags: ['biology', 'cell'],
-    },
-    {
-      id: 'sample-4',
-      type: 'cloze',
-      front: 'In {{c1::React Native}}, you can use {{c2::JavaScript}} to build {{c3::mobile apps}} for both iOS and Android.',
-      back: 'In React Native, you can use JavaScript to build mobile apps for both iOS and Android.',
-      tags: ['programming', 'react-native', 'mobile'],
-    },
-  ];
+
 
   const fetchFlashcards = async () => {
     try {
@@ -337,11 +308,30 @@ export default function FlashcardDeck() {
 
       let flashcardData = dueData?.flashcards || [];
       
-      // If no flashcards exist, use sample data for testing
-      if (flashcardData.length === 0) {
-        flashcardData = sampleFlashcards;
-      }
+      // If no flashcards are due, fetch the next upcoming due date
+      if (flashcardData.length === 0 && user) {
+        const { data: nextCardData, error: nextCardError } = await supabase
+          .from('flashcards')
+          .select('due')
+          .eq('user_id', user.id)
+          .eq('is_deleted', false)
+          .not('state', 'eq', 'NEW')
+          .gt('due', new Date().toISOString())
+          .order('due', { ascending: true })
+          .limit(1)
+          .single();
 
+        if (!nextCardError && nextCardData?.due) {
+          setStats(prev => prev ? { ...prev, next_due_date: nextCardData.due } : { 
+            due_today: 0, 
+            due_overdue: 0, 
+            new_cards: 0, 
+            total_reviews_today: 0, 
+            next_due_date: nextCardData.due 
+          });
+        }
+      }
+      
       // Don't shuffle - cards are already prioritized by due date from FSRS
       setFlashcards(flashcardData);
       setCurrentIndex(0);
@@ -349,9 +339,8 @@ export default function FlashcardDeck() {
       resetCardPosition();
     } catch (error) {
       console.error('Error fetching flashcards:', error);
-      // Fallback to sample data on error
-      const randomizedCards = shuffleArray([...sampleFlashcards]);
-      setFlashcards(randomizedCards);
+      // Set empty array on error - user will see empty state
+      setFlashcards([]);
       setCurrentIndex(0);
       setIsFlipped(false);
       resetCardPosition();
@@ -395,14 +384,7 @@ export default function FlashcardDeck() {
     }
   };
 
-  const shuffleArray = (array: Flashcard[]) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
+
 
   const flipCard = useCallback(() => {
     const animation = Animated.timing(flipValue, {
@@ -857,6 +839,52 @@ export default function FlashcardDeck() {
     );
   }
 
+  // Empty state - no flashcards available
+  if (flashcards.length === 0) {
+    const formatNextDueDate = (dueDateString: string) => {
+      console.log('dueDateString', dueDateString);
+      const dueDate = new Date(dueDateString);
+      const now = new Date();
+      const diffMs = dueDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) {
+        return 'later today';
+      } else if (diffDays === 1) {
+        return 'tomorrow';
+      } else if (diffDays <= 7) {
+        return `in ${diffDays} days`;
+      } else {
+        return dueDate.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: dueDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        });
+      }
+    };
+
+    const nextDueDateText = stats?.next_due_date ? formatNextDueDate(stats.next_due_date) : null;
+
+    return (
+      <ThemedView style={styles.emptyContainer}>
+        <ThemedText style={styles.emptyIcon}>📚</ThemedText>
+        <ThemedText style={styles.emptyTitle}>No flashcards are due</ThemedText>
+        <ThemedText style={styles.emptyText}>
+          Great! You&apos;re all caught up with your reviews.{'\n'}
+          {nextDueDateText 
+            ? `Your next review is ${nextDueDateText}.` 
+            : 'Go learn more concepts to create new flashcards.'
+          }
+        </ThemedText>
+        <TouchableWithoutFeedback onPress={fetchFlashcards}>
+          <View style={[styles.refreshButton, { backgroundColor: tintColor }]}>
+            <ThemedText style={[styles.refreshButtonText, { color: backgroundColor }]}>🔄 Refresh</ThemedText>
+          </View>
+        </TouchableWithoutFeedback>
+      </ThemedView>
+    );
+  }
+
   const submitReview = async (rating: number) => {
     if (!user || currentIndex >= flashcards.length || isReviewing) return;
     
@@ -1300,6 +1328,39 @@ const styles = StyleSheet.create({
   },
   restartButtonText: {
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    opacity: 0.7,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  refreshButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  refreshButtonText: {
+    fontSize: 14,
     fontWeight: 'bold',
   },
 });
