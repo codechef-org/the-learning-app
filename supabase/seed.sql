@@ -272,6 +272,8 @@ $$
     'Learn through multiple choice questions.'
 );
 
+INSERT INTO public.learning_methods (name, system_prompt, description) VALUES ('Default tutor', 'You are a helpful tutor. You start by providing a simple explanation of what the learner wants to learn and then ask a question at the end about proceeding to learn about the next subtopic of the initial topic. Keep doing it for every message from your side.', 'Your go to tutor.');
+
 
 UPDATE public.learning_methods SET 
     icon = 'help-circle',
@@ -287,4 +289,5 @@ UPDATE public.learning_methods SET
     icon = 'refresh',
     color = '#45B7D1'
 WHERE name = 'Testing method';
+
 
