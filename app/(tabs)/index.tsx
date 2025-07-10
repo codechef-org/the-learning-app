@@ -120,7 +120,11 @@ export default function LearnScreen() {
             <ThemedText type="defaultSemiBold" style={styles.sessionTitle}>
               {currentSession.learning_method.name}
             </ThemedText>
-            <ThemedText style={styles.sessionTopic}>
+            <ThemedText 
+              style={styles.sessionTopic}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {currentSession.topic}
             </ThemedText>
           </View>
