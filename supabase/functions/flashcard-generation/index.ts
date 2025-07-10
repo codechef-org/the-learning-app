@@ -619,7 +619,7 @@ ${conversation}`
 
   try {
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: {
@@ -632,7 +632,7 @@ ${conversation}`
           generationConfig: {
             response_mime_type: 'application/json',
             response_schema: flashcardSchema,
-            temperature: 0.3, // Lower temperature for more consistent JSON output
+            temperature: 0.2, // Lower temperature for thinking mode to maintain consistency
             maxOutputTokens: 8192,
           },
           safetySettings: [
