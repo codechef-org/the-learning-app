@@ -5,7 +5,9 @@
  * - NEW CARDS: Shows both front and back simultaneously for learning
  * - REVIEW CARDS: Traditional flip behavior for testing recall
  * - FSRS Algorithm: Scientific spaced repetition scheduling
- * - Swipe Gestures: Rate cards with directional swipes
+ * - Swipe Gestures: Rate cards with directional swipes (mobile)
+ * - Button Controls: Rate cards with buttons (web)
+ * - Keyboard Shortcuts: Rate cards with keys 1-4 (web)
  * - Animations: Smooth card transitions and feedback
  */
 
@@ -14,24 +16,30 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Dimensions,
-    StyleSheet,
-    TouchableWithoutFeedback,
-    View
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  TouchableWithoutFeedback,
+  View
 } from 'react-native';
 import {
-    LongPressGestureHandler,
-    PanGestureHandler,
-    PanGestureHandlerGestureEvent,
-    State
+  LongPressGestureHandler,
+  PanGestureHandler,
+  PanGestureHandlerGestureEvent,
+  State
 } from 'react-native-gesture-handler';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Web-responsive sizing
+const isWeb = Platform.OS === 'web';
+const CARD_WIDTH = isWeb ? Math.min(screenWidth * 0.7, 600) : screenWidth * 0.9;
+const CARD_HEIGHT = isWeb ? Math.min(screenHeight * 0.7, 500) : screenHeight * 0.6;
 
 interface Flashcard {
   id: string;
@@ -59,9 +67,6 @@ interface FlashcardStats {
   total_reviews_today: number;
   next_due_date?: string;
 }
-
-const CARD_WIDTH = screenWidth * 0.9;
-const CARD_HEIGHT = screenHeight * 0.6;
 
 // Animation constants for consistency
 const ANIMATION_CONFIG = {
@@ -184,6 +189,8 @@ export default function FlashcardDeck() {
       stopAllAnimations();
     };
   }, [stopAllAnimations]);
+
+
 
   useEffect(() => {
     if (user) {
@@ -1078,6 +1085,65 @@ export default function FlashcardDeck() {
     }
   };
 
+  // Keyboard shortcuts for web
+  useEffect(() => {
+    if (!isWeb) return;
+
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (currentIndex >= flashcards.length || isReviewing) return;
+
+      const currentCard = flashcards[currentIndex];
+      if (!currentCard) return;
+
+      // Don't handle keys if user hasn't seen the answer for review cards
+      if (!isNewCard(currentCard) && !hasSeenAnswer) {
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault();
+          flipCard();
+        }
+        return;
+      }
+
+      switch (event.key) {
+        case '1':
+          event.preventDefault();
+          submitReview(1); // Again
+          break;
+        case '2':
+          event.preventDefault();
+          submitReview(2); // Hard
+          break;
+        case '3':
+          event.preventDefault();
+          submitReview(3); // Good
+          break;
+        case '4':
+          event.preventDefault();
+          submitReview(4); // Easy
+          break;
+        case ' ':
+        case 'Enter':
+          event.preventDefault();
+          if (!isNewCard(currentCard)) {
+            flipCard();
+          }
+          break;
+        case 'Delete':
+        case 'Backspace':
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            handleLongPress();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [currentIndex, flashcards, isReviewing, hasSeenAnswer, isNewCard, flipCard, submitReview, handleLongPress]);
+
   const restartDeck = () => {
     // Refetch cards to get fresh due cards with FSRS prioritization
     fetchFlashcards();
@@ -1140,130 +1206,315 @@ export default function FlashcardDeck() {
         )}
 
         {/* Current card */}
-        <LongPressGestureHandler
-          onHandlerStateChange={onLongPressStateChange}
-          minDurationMs={800}
-        >
-          <PanGestureHandler
-            onGestureEvent={onGestureEvent}
-            onHandlerStateChange={onHandlerStateChange}
+        {isWeb ? (
+          // Web version - without gesture handlers
+          <Animated.View
+            style={[
+              styles.card,
+              styles.currentCard,
+              {
+                transform: [
+                  { translateX },
+                  { translateY },
+                  { rotate: rotate.interpolate({
+                    inputRange: [-1, 1],
+                    outputRange: ['-1deg', '1deg'],
+                  }) },
+                  { scale },
+                ],
+              },
+            ]}
           >
-            <Animated.View
-              style={[
-                styles.card,
-                styles.currentCard,
-                {
-                  transform: [
-                    { translateX },
-                    { translateY },
-                    { rotate: rotate.interpolate({
-                      inputRange: [-1, 1],
-                      outputRange: ['-1deg', '1deg'],
-                    }) },
-                    { scale },
-                  ],
-                },
-              ]}
-            >
-              <TouchableWithoutFeedback onPress={flipCard}>
-                <View style={styles.cardInteractionArea}>
-                  {/* Delete overlay */}
+            <TouchableWithoutFeedback onPress={flipCard}>
+              <View style={styles.cardInteractionArea}>
+                {/* Rating overlay */}
+                {(previewRating || selectedRating) && (
                   <Animated.View
                     style={[
-                      styles.deleteOverlay,
+                      styles.ratingOverlay,
                       {
-                        opacity: deleteOpacity,
+                        opacity: selectedRating ? 1 : ratingOpacity,
+                        backgroundColor: getRatingColor(previewRating || selectedRating || 3),
                       },
                     ]}
                   >
-                    <ThemedText style={styles.deleteText}>🗑️ Release to Delete</ThemedText>
-                  </Animated.View>
-
-                  {/* Rating overlay */}
-                  {(previewRating || selectedRating) && (
-                    <Animated.View
-                      style={[
-                        styles.ratingOverlay,
-                        {
-                          opacity: selectedRating ? 1 : ratingOpacity,
-                          backgroundColor: getRatingColor(previewRating || selectedRating || 3),
-                        },
-                      ]}
-                    >
-                      <ThemedText style={styles.ratingText}>
-                        {getRatingLabel(previewRating || selectedRating || 3)}
+                    <ThemedText style={styles.ratingText}>
+                      {getRatingLabel(previewRating || selectedRating || 3)}
+                    </ThemedText>
+                    {selectedRating && (
+                      <ThemedText style={styles.ratingSubtext}>
+                        Review submitted!
                       </ThemedText>
-                      {selectedRating && (
-                        <ThemedText style={styles.ratingSubtext}>
-                          Review submitted!
-                        </ThemedText>
-                      )}
-                    </Animated.View>
-                  )}
+                    )}
+                  </Animated.View>
+                )}
 
-                  {/* Render new card layout or traditional flip card */}
-                  {isNewCard(currentCard) ? (
-                    // New card: show both sides simultaneously
-                    <View
+                {/* Render new card layout or traditional flip card */}
+                {isNewCard(currentCard) ? (
+                  // New card: show both sides simultaneously
+                  <View
+                    style={[
+                      styles.cardFace,
+                      { 
+                        backgroundColor: cardFrontColor,
+                        shadowColor: shadowColor,
+                      },
+                    ]}
+                  >
+                    {renderNewCardLayout(currentCard)}
+                  </View>
+                ) : (
+                  // Review card: traditional flip behavior
+                  <>
+                    {/* Front of card */}
+                    <Animated.View
                       style={[
                         styles.cardFace,
                         { 
                           backgroundColor: cardFrontColor,
                           shadowColor: shadowColor,
                         },
+                        frontAnimatedStyle,
                       ]}
                     >
-                      {renderNewCardLayout(currentCard)}
-                    </View>
-                  ) : (
-                    // Review card: traditional flip behavior
-                    <>
-                      {/* Front of card */}
+                      {renderFlashcardContent(currentCard, 'front')}
+                    </Animated.View>
+
+                    {/* Back of card */}
+                    <Animated.View
+                      style={[
+                        styles.cardFace,
+                        styles.cardBack,
+                        { 
+                          backgroundColor: cardBackColor,
+                          shadowColor: shadowColor,
+                        },
+                        backAnimatedStyle,
+                      ]}
+                    >
+                      {renderFlashcardContent(currentCard, 'back')}
+                    </Animated.View>
+                  </>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </Animated.View>
+        ) : (
+          // Mobile version - with gesture handlers
+          <LongPressGestureHandler
+            onHandlerStateChange={onLongPressStateChange}
+            minDurationMs={800}
+          >
+            <PanGestureHandler
+              onGestureEvent={onGestureEvent}
+              onHandlerStateChange={onHandlerStateChange}
+            >
+              <Animated.View
+                style={[
+                  styles.card,
+                  styles.currentCard,
+                  {
+                    transform: [
+                      { translateX },
+                      { translateY },
+                      { rotate: rotate.interpolate({
+                        inputRange: [-1, 1],
+                        outputRange: ['-1deg', '1deg'],
+                      }) },
+                      { scale },
+                    ],
+                  },
+                ]}
+              >
+                <TouchableWithoutFeedback onPress={flipCard}>
+                  <View style={styles.cardInteractionArea}>
+                    {/* Delete overlay */}
+                    <Animated.View
+                      style={[
+                        styles.deleteOverlay,
+                        {
+                          opacity: deleteOpacity,
+                        },
+                      ]}
+                    >
+                      <ThemedText style={styles.deleteText}>🗑️ Release to Delete</ThemedText>
+                    </Animated.View>
+
+                    {/* Rating overlay */}
+                    {(previewRating || selectedRating) && (
                       <Animated.View
+                        style={[
+                          styles.ratingOverlay,
+                          {
+                            opacity: selectedRating ? 1 : ratingOpacity,
+                            backgroundColor: getRatingColor(previewRating || selectedRating || 3),
+                          },
+                        ]}
+                      >
+                        <ThemedText style={styles.ratingText}>
+                          {getRatingLabel(previewRating || selectedRating || 3)}
+                        </ThemedText>
+                        {selectedRating && (
+                          <ThemedText style={styles.ratingSubtext}>
+                            Review submitted!
+                          </ThemedText>
+                        )}
+                      </Animated.View>
+                    )}
+
+                    {/* Render new card layout or traditional flip card */}
+                    {isNewCard(currentCard) ? (
+                      // New card: show both sides simultaneously
+                      <View
                         style={[
                           styles.cardFace,
                           { 
                             backgroundColor: cardFrontColor,
                             shadowColor: shadowColor,
                           },
-                          frontAnimatedStyle,
                         ]}
                       >
-                        {renderFlashcardContent(currentCard, 'front')}
-                      </Animated.View>
+                        {renderNewCardLayout(currentCard)}
+                      </View>
+                    ) : (
+                      // Review card: traditional flip behavior
+                      <>
+                        {/* Front of card */}
+                        <Animated.View
+                          style={[
+                            styles.cardFace,
+                            { 
+                              backgroundColor: cardFrontColor,
+                              shadowColor: shadowColor,
+                            },
+                            frontAnimatedStyle,
+                          ]}
+                        >
+                          {renderFlashcardContent(currentCard, 'front')}
+                        </Animated.View>
 
-                      {/* Back of card */}
-                      <Animated.View
-                        style={[
-                          styles.cardFace,
-                          styles.cardBack,
-                          { 
-                            backgroundColor: cardBackColor,
-                            shadowColor: shadowColor,
-                          },
-                          backAnimatedStyle,
-                        ]}
-                      >
-                        {renderFlashcardContent(currentCard, 'back')}
-                      </Animated.View>
-                    </>
-                  )}
-                </View>
-              </TouchableWithoutFeedback>
-            </Animated.View>
-          </PanGestureHandler>
-        </LongPressGestureHandler>
+                        {/* Back of card */}
+                        <Animated.View
+                          style={[
+                            styles.cardFace,
+                            styles.cardBack,
+                            { 
+                              backgroundColor: cardBackColor,
+                              shadowColor: shadowColor,
+                            },
+                            backAnimatedStyle,
+                          ]}
+                        >
+                          {renderFlashcardContent(currentCard, 'back')}
+                        </Animated.View>
+                      </>
+                    )}
+                  </View>
+                </TouchableWithoutFeedback>
+              </Animated.View>
+            </PanGestureHandler>
+          </LongPressGestureHandler>
+        )}
       </View>
+
+      {/* Web controls */}
+      {isWeb && (
+        <View style={styles.webControls}>
+          {/* Show rating buttons only if user has seen the answer */}
+          {(isNewCard(currentCard) || hasSeenAnswer) && (
+            <View style={styles.ratingButtons}>
+              <Button
+                mode="contained"
+                onPress={() => submitReview(1)}
+                style={[styles.ratingButton, { backgroundColor: getRatingColor(1) }]}
+                textColor="#ffffff"
+                disabled={isReviewing}
+                compact
+              >
+                1 - Again
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => submitReview(2)}
+                style={[styles.ratingButton, { backgroundColor: getRatingColor(2) }]}
+                textColor="#ffffff"
+                disabled={isReviewing}
+                compact
+              >
+                2 - Hard
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => submitReview(3)}
+                style={[styles.ratingButton, { backgroundColor: getRatingColor(3) }]}
+                textColor="#ffffff"
+                disabled={isReviewing}
+                compact
+              >
+                3 - Good
+              </Button>
+              <Button
+                mode="contained"
+                onPress={() => submitReview(4)}
+                style={[styles.ratingButton, { backgroundColor: getRatingColor(4) }]}
+                textColor="#ffffff"
+                disabled={isReviewing}
+                compact
+              >
+                4 - Easy
+              </Button>
+            </View>
+          )}
+          
+          {/* Show flip button for review cards when answer not seen */}
+          {!isNewCard(currentCard) && !hasSeenAnswer && (
+            <View style={styles.flipButtonContainer}>
+              <Button
+                mode="contained"
+                onPress={flipCard}
+                style={[styles.flipButton, { backgroundColor: tintColor }]}
+                textColor="#ffffff"
+                icon="eye"
+              >
+                Show Answer (Space/Enter)
+              </Button>
+            </View>
+          )}
+
+          {/* Delete button */}
+          <View style={styles.deleteButtonContainer}>
+            <Button
+              mode="outlined"
+              onPress={handleLongPress}
+              style={styles.deleteButton}
+              textColor="#ef4444"
+              icon="delete"
+              compact
+            >
+              Delete (Ctrl+Del)
+            </Button>
+          </View>
+        </View>
+      )}
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          {isNewCard(currentCard) 
-            ? "New card - both sides shown • Swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
-            : "Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
-          }
+          {isWeb ? (
+            // Web instructions
+            isNewCard(currentCard) 
+              ? "New card - both sides shown • Use buttons or keys 1-4 to rate"
+              : hasSeenAnswer
+                ? "Use buttons or keys 1-4 to rate: 1=Again, 2=Hard, 3=Good, 4=Easy"
+                : "Click 'Show Answer' or press Space/Enter to flip"
+          ) : (
+            // Mobile instructions
+            isNewCard(currentCard) 
+              ? "New card - both sides shown • Swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
+              : "Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
+          )}
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.4 }]}>
-          Long press to delete
+          {isWeb ? "Keyboard shortcuts: 1-4 to rate, Space/Enter to flip, Ctrl+Del to delete" : "Long press to delete"}
         </ThemedText>
       </View>
     </ThemedView>
@@ -1554,5 +1805,36 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     letterSpacing: 0.5,
+  },
+  // Web-specific styles
+  webControls: {
+    marginTop: 20,
+    alignItems: 'center',
+    width: CARD_WIDTH,
+  },
+  ratingButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  ratingButton: {
+    minWidth: 100,
+    borderRadius: 8,
+  },
+  flipButtonContainer: {
+    marginBottom: 16,
+  },
+  flipButton: {
+    borderRadius: 8,
+    paddingHorizontal: 24,
+  },
+  deleteButtonContainer: {
+    marginTop: 8,
+  },
+  deleteButton: {
+    borderColor: '#ef4444',
+    borderRadius: 8,
   },
 });
