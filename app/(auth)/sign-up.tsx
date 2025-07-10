@@ -2,20 +2,21 @@ import { useAuth } from '@/context/AuthContext';
 import { Link, router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    View,
+   Alert,
+   KeyboardAvoidingView,
+   Platform,
+   ScrollView,
+   StyleSheet,
+   View,
 } from 'react-native';
 import {
-    Button,
-    Paragraph,
-    Surface,
-    Text,
-    TextInput,
-    Title,
+   Button,
+   Paragraph,
+   Snackbar,
+   Surface,
+   Text,
+   TextInput,
+   Title,
 } from 'react-native-paper';
 
 export default function SignUpScreen() {
@@ -25,33 +26,39 @@ export default function SignUpScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showError, setShowError] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const { signUp } = useAuth();
 
-  const handleSignUp = async () => {
-    if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await signUp(email, password);
-
-    if (error) {
-      Alert.alert('Sign Up Error', error.message);
+  const showErrorMessage = (message: string) => {
+    if (Platform.OS === 'web') {
+      // Use Snackbar on web
+      setErrorMessage(message);
+      setShowError(true);
+      setShowSuccess(false);
     } else {
+      // Use native Alert on mobile platforms
+      Alert.alert('Error', message);
+    }
+  };
+
+  const showSuccessMessage = (message: string) => {
+    if (Platform.OS === 'web') {
+      // Use Snackbar on web
+      setSuccessMessage(message);
+      setShowSuccess(true);
+      setShowError(false);
+      // Navigate to sign-in after a delay
+      setTimeout(() => {
+        router.replace('/(auth)/sign-in');
+      }, 3000);
+    } else {
+      // Use native Alert on mobile platforms
       Alert.alert(
         'Success',
-        'Account created successfully! Please check your email to verify your account.',
+        message,
         [
           {
             text: 'OK',
@@ -59,6 +66,32 @@ export default function SignUpScreen() {
           },
         ]
       );
+    }
+  };
+
+  const handleSignUp = async () => {
+    if (!email || !password || !confirmPassword) {
+      showErrorMessage('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showErrorMessage('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      showErrorMessage('Password must be at least 6 characters long');
+      return;
+    }
+
+    setLoading(true);
+    const { error } = await signUp(email, password);
+
+    if (error) {
+      showErrorMessage(error.message || 'Sign up failed');
+    } else {
+      showSuccessMessage('Account created successfully! Please check your email to verify your account.');
     }
     setLoading(false);
   };
@@ -136,6 +169,39 @@ export default function SignUpScreen() {
           </View>
         </Surface>
       </ScrollView>
+      
+      {Platform.OS === 'web' && (
+        <>
+          <Snackbar
+            visible={showError}
+            onDismiss={() => setShowError(false)}
+            duration={4000}
+            style={styles.errorSnackbar}
+            action={{
+              label: 'Dismiss',
+              onPress: () => setShowError(false),
+            }}
+          >
+            {errorMessage}
+          </Snackbar>
+
+          <Snackbar
+            visible={showSuccess}
+            onDismiss={() => setShowSuccess(false)}
+            duration={6000}
+            style={styles.successSnackbar}
+            action={{
+              label: 'Sign In',
+              onPress: () => {
+                setShowSuccess(false);
+                router.replace('/(auth)/sign-in');
+              },
+            }}
+          >
+            {successMessage}
+          </Snackbar>
+        </>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -186,5 +252,11 @@ const styles = StyleSheet.create({
   link: {
     color: '#6200EE',
     fontWeight: 'bold',
+  },
+  errorSnackbar: {
+    backgroundColor: '#d32f2f',
+  },
+  successSnackbar: {
+    backgroundColor: '#2e7d32',
   },
 }); 

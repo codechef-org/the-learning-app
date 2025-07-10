@@ -2,20 +2,21 @@ import { useAuth } from '@/context/AuthContext';
 import { Link, router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
 } from 'react-native';
 import {
-    Button,
-    Paragraph,
-    Surface,
-    Text,
-    TextInput,
-    Title,
+  Button,
+  Paragraph,
+  Snackbar,
+  Surface,
+  Text,
+  TextInput,
+  Title,
 } from 'react-native-paper';
 
 export default function SignInScreen() {
@@ -23,11 +24,24 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showError, setShowError] = useState(false);
   const { signIn } = useAuth();
+
+  const showErrorMessage = (message: string) => {
+    if (Platform.OS === 'web') {
+      // Use Snackbar on web
+      setErrorMessage(message);
+      setShowError(true);
+    } else {
+      // Use native Alert on mobile platforms
+      Alert.alert('Error', message);
+    }
+  };
 
   const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showErrorMessage('Please fill in all fields');
       return;
     }
 
@@ -35,7 +49,7 @@ export default function SignInScreen() {
     const { error } = await signIn(email, password);
 
     if (error) {
-      Alert.alert('Sign In Error', error.message);
+      showErrorMessage(error.message || 'Sign in failed');
     } else {
       router.replace('/(tabs)');
     }
@@ -100,6 +114,21 @@ export default function SignInScreen() {
           </View>
         </Surface>
       </ScrollView>
+      
+      {Platform.OS === 'web' && (
+        <Snackbar
+          visible={showError}
+          onDismiss={() => setShowError(false)}
+          duration={4000}
+          style={styles.snackbar}
+          action={{
+            label: 'Dismiss',
+            onPress: () => setShowError(false),
+          }}
+        >
+          {errorMessage}
+        </Snackbar>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -150,5 +179,8 @@ const styles = StyleSheet.create({
   link: {
     color: '#6200EE',
     fontWeight: 'bold',
+  },
+  snackbar: {
+    backgroundColor: '#d32f2f',
   },
 }); 
