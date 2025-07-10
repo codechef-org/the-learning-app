@@ -61,6 +61,11 @@ export default function TabLayout() {
             shadowOffset: { width: 0, height: -2 },
             shadowRadius: 8,
           },
+          web: {
+            backgroundColor: '#1a1a1a',
+            borderTopWidth: 0,
+            boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.3)',
+          },
           default: {
             backgroundColor: '#1a1a1a',
             borderTopWidth: 0,
