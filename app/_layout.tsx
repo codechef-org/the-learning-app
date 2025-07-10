@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, View } from 'react-native';
+import { Platform, View, ViewStyle } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
@@ -27,22 +27,37 @@ export default function RootLayout() {
   // Use GestureHandlerRootView only on mobile platforms
   const RootContainer = Platform.OS === 'web' ? View : GestureHandlerRootView;
 
+  // Web-specific container styling for limited width
+  const containerStyle: ViewStyle = Platform.select({
+    web: {
+      flex: 1,
+      maxWidth: 600,
+      alignSelf: 'center',
+      width: '100%',
+    } as ViewStyle,
+    default: {
+      flex: 1,
+    },
+  }) || { flex: 1 };
+
   return (
     <RootContainer style={{ flex: 1 }}>
-      <AuthProvider>
-        <PaperProvider theme={paperTheme}>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AuthGuard>
-              <Stack>
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen name="+not-found" />
-              </Stack>
-            </AuthGuard>
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </PaperProvider>
-      </AuthProvider>
+      <View style={containerStyle}>
+        <AuthProvider>
+          <PaperProvider theme={paperTheme}>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AuthGuard>
+                <Stack>
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </AuthGuard>
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </PaperProvider>
+        </AuthProvider>
+      </View>
     </RootContainer>
   );
 }
