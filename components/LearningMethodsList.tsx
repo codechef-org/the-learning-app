@@ -1,14 +1,14 @@
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -32,7 +32,21 @@ export default function LearningMethodsList({ onSelectMethod }: LearningMethodsL
   const [selectedMethod, setSelectedMethod] = useState<LearningMethod | null>(null);
   const [topic, setTopic] = useState('');
   const [showTopicModal, setShowTopicModal] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
   const { user } = useAuth();
+  const colorScheme = useColorScheme();
+
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#f8f9fa';
+  const cardBackgroundColor = isDark ? '#2c2c2c' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#1a1a1a';
+  const subtitleColor = isDark ? '#cccccc' : '#666';
+  const modalBackgroundColor = isDark ? '#2c2c2c' : '#ffffff';
+  const inputBackgroundColor = isDark ? '#333333' : '#ffffff';
+  const inputBorderColor = isDark ? '#555555' : '#ddd';
+  const inputTextColor = isDark ? '#ffffff' : '#000000';
+  const cancelButtonColor = isDark ? '#444444' : '#f0f0f0';
 
   useEffect(() => {
     loadLearningMethods();
@@ -94,16 +108,26 @@ export default function LearningMethodsList({ onSelectMethod }: LearningMethodsL
     }
   };
 
-  const renderMethodCard = ({ item }: { item: LearningMethod }) => (
+  const renderMethodCard = (method: LearningMethod) => (
     <TouchableOpacity
-      style={[styles.methodCard, { borderLeftColor: item.color }]}
-      onPress={() => handleMethodSelect(item)}
+      key={method.id}
+      style={[
+        styles.methodCard,
+        { 
+          borderLeftColor: method.color,
+          backgroundColor: cardBackgroundColor,
+          shadowColor: isDark ? '#000' : '#000',
+        }
+      ]}
+      onPress={() => handleMethodSelect(method)}
     >
       <View style={styles.methodHeader}>
-        <Text style={styles.methodIcon}>{getIcon(item.icon)}</Text>
-        <Text style={styles.methodName}>{item.name}</Text>
+        <Text style={styles.methodIcon}>{getIcon(method.icon)}</Text>
+        <Text style={[styles.methodName, { color: textColor }]}>{method.name}</Text>
       </View>
-      <Text style={styles.methodDescription}>{item.description}</Text>
+      <Text style={[styles.methodDescription, { color: subtitleColor }]}>
+        {method.description}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -120,70 +144,69 @@ export default function LearningMethodsList({ onSelectMethod }: LearningMethodsL
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>Loading learning methods...</Text>
+      <View style={[styles.loadingContainer, { backgroundColor }]}>
+        <Text style={[styles.loadingText, { color: subtitleColor }]}>Loading learning methods...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-      <Text style={styles.title}>Choose Your Learning Method</Text>
-      <Text style={styles.subtitle}>
-        Select a learning approach that works best for you
+    <View style={[styles.container, { backgroundColor }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <Text style={[styles.title, { color: textColor }]}>Choose Your Learning Method</Text>
+      <Text style={[styles.subtitle, { color: subtitleColor }]}>
+        Select a method that matches your learning style
       </Text>
       
-      <FlatList
-        data={methods}
-        renderItem={renderMethodCard}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={styles.listContainer}>
+        {methods.map(renderMethodCard)}
+      </View>
 
       <Modal
         visible={showTopicModal}
+        transparent
         animationType="slide"
-        presentationStyle="pageSheet"
         onRequestClose={() => setShowTopicModal(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedMethod?.name}
-            </Text>
-            <Text style={styles.modalSubtitle}>
-              What would you like to learn about?
+          <View style={[styles.modalContent, { backgroundColor: modalBackgroundColor }]}>
+            <Text style={[styles.modalTitle, { color: textColor }]}>What would you like to learn?</Text>
+            <Text style={[styles.modalSubtitle, { color: subtitleColor }]}>
+              Enter a topic you&apos;d like to explore with {selectedMethod?.name}
             </Text>
             
             <TextInput
-              style={styles.topicInput}
-              placeholder="Enter a topic (e.g., React Native, Machine Learning, Spanish)"
+              style={[
+                styles.topicInput,
+                { 
+                  backgroundColor: inputBackgroundColor,
+                  borderColor: inputBorderColor,
+                  color: inputTextColor
+                }
+              ]}
               value={topic}
               onChangeText={setTopic}
+              placeholder="e.g., Python programming, World War 2, Calculus..."
+              placeholderTextColor={subtitleColor}
               multiline
-              numberOfLines={3}
-              textAlignVertical="top"
+              autoFocus
             />
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => {
-                  setShowTopicModal(false);
-                  setTopic('');
-                }}
+                style={[styles.button, styles.cancelButton, { backgroundColor: cancelButtonColor }]}
+                onPress={() => setShowTopicModal(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.buttonText, { color: textColor }]}>Cancel</Text>
               </TouchableOpacity>
-              
               <TouchableOpacity
                 style={[styles.button, styles.startButton]}
                 onPress={handleStartLearning}
-                disabled={!topic.trim()}
+                disabled={!topic.trim() || startingChat}
               >
-                <Text style={styles.startButtonText}>Start Learning</Text>
+                <Text style={[styles.buttonText, { color: '#ffffff' }]}>
+                  {startingChat ? 'Starting...' : 'Start Learning'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -196,7 +219,6 @@ export default function LearningMethodsList({ onSelectMethod }: LearningMethodsL
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
     padding: 16,
   },
   loadingContainer: {
@@ -204,16 +226,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    fontSize: 16,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 24,
     textAlign: 'center',
   },
@@ -221,12 +244,10 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   methodCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
     borderLeftWidth: 4,
-    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -247,12 +268,10 @@ const styles = StyleSheet.create({
   methodName: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
     flex: 1,
   },
   methodDescription: {
     fontSize: 14,
-    color: '#666',
     lineHeight: 20,
   },
   modalContainer: {
@@ -261,7 +280,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
@@ -270,17 +288,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 24,
   },
   topicInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 16,
     fontSize: 16,
@@ -298,19 +313,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
   },
   startButton: {
     backgroundColor: '#007AFF',
   },
-  cancelButtonText: {
+  buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
-  },
-  startButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
   },
 }); 

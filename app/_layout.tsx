@@ -31,7 +31,7 @@ export default function RootLayout() {
   const containerStyle: ViewStyle = Platform.select({
     web: {
       flex: 1,
-      maxWidth: 600,
+      maxWidth: 700,
       alignSelf: 'center',
       width: '100%',
     } as ViewStyle,
@@ -40,8 +40,19 @@ export default function RootLayout() {
     },
   }) || { flex: 1 };
 
+  // Root container style with dark background for web
+  const rootContainerStyle: ViewStyle = Platform.select({
+    web: {
+      flex: 1,
+      backgroundColor: colorScheme === 'dark' ? '#121212' : '#f5f5f5',
+    },
+    default: {
+      flex: 1,
+    },
+  }) || { flex: 1 };
+
   return (
-    <RootContainer style={{ flex: 1 }}>
+    <RootContainer style={rootContainerStyle}>
       <View style={containerStyle}>
         <AuthProvider>
           <PaperProvider theme={paperTheme}>

@@ -1,3 +1,4 @@
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
@@ -32,6 +33,11 @@ export default function ChatScreen({
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+  
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#FFFFFF';
   
   // Ref to track if component is mounted for cleanup
   const isMountedRef = useRef(true);
@@ -266,8 +272,8 @@ export default function ChatScreen({
   }, [messages, chatId, systemPrompt, learningMethodName]);
 
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={[styles.container, { backgroundColor }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -280,7 +286,7 @@ export default function ChatScreen({
             learningMethodName={learningMethodName}
           />
         </View>
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { backgroundColor }]}>
           <ChatInput
             onSend={handleSendMessage}
             placeholder="Ask me anything about your topic..."
@@ -295,7 +301,6 @@ export default function ChatScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -304,6 +309,5 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   inputContainer: {
-    backgroundColor: '#FFFFFF',
   },
 }); 

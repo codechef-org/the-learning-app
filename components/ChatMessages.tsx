@@ -1,11 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import Markdown from 'react-native-markdown-display';
+
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export interface Message {
   id: string;
@@ -26,7 +28,18 @@ export default function ChatMessages({
   isLoading = false,
   learningMethodName 
 }: ChatMessagesProps) {
+  const colorScheme = useColorScheme();
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#f8f9fa';
+  const assistantBubbleColor = isDark ? '#2c2c2c' : '#FFFFFF';
+  const assistantTextColor = isDark ? '#ffffff' : '#000000';
+  const assistantBorderColor = isDark ? '#444444' : '#e0e0e0';
+  const senderNameColor = isDark ? '#cccccc' : '#666';
+  const timestampColor = isDark ? '#cccccc' : '#666';
+  const loadingTextColor = isDark ? '#cccccc' : '#666';
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -36,6 +49,87 @@ export default function ChatMessages({
       }, 100);
     }
   }, [messages.length]);
+
+  const getMarkdownStyles = () => ({
+    body: {
+      color: assistantTextColor,
+      fontSize: 16,
+      lineHeight: 20,
+      margin: 0,
+    },
+    paragraph: {
+      marginTop: 0,
+      marginBottom: 8,
+    },
+    strong: {
+      fontWeight: 'bold' as 'bold',
+    },
+    em: {
+      fontStyle: 'italic' as 'italic',
+    },
+    code_inline: {
+      backgroundColor: isDark ? '#3c3c3c' : '#f0f0f0',
+      color: assistantTextColor,
+      padding: 2,
+      borderRadius: 3,
+      fontFamily: 'Courier',
+      fontSize: 14,
+    },
+    code_block: {
+      backgroundColor: isDark ? '#2a2a2a' : '#f8f8f8',
+      color: assistantTextColor,
+      padding: 10,
+      borderRadius: 5,
+      fontFamily: 'Courier',
+      fontSize: 14,
+      marginVertical: 8,
+    },
+    blockquote: {
+      backgroundColor: isDark ? '#2a2a2a' : '#f9f9f9',
+      borderLeftWidth: 4,
+      borderLeftColor: isDark ? '#555' : '#ddd',
+      paddingLeft: 10,
+      marginVertical: 8,
+    },
+    list_item: {
+      marginVertical: 2,
+      flexDirection: 'row' as 'row',
+      alignItems: 'flex-start' as 'flex-start',
+    },
+    bullet_list: {
+      marginVertical: 8,
+    },
+    ordered_list: {
+      marginVertical: 8,
+    },
+    heading1: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      marginVertical: 8,
+      color: assistantTextColor,
+    },
+    heading2: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      marginVertical: 6,
+      color: assistantTextColor,
+    },
+    heading3: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginVertical: 4,
+      color: assistantTextColor,
+    },
+    link: {
+      color: '#007AFF',
+      textDecorationLine: 'underline',
+    },
+    hr: {
+      backgroundColor: isDark ? '#555' : '#ddd',
+      height: 1,
+      marginVertical: 10,
+    },
+  });
 
   const renderMessage = (message: Message) => {
     return (
@@ -49,11 +143,14 @@ export default function ChatMessages({
         <View
           style={[
             styles.messageBubble,
-            message.isUser ? styles.userBubble : styles.assistantBubble,
+            message.isUser ? styles.userBubble : [styles.assistantBubble, { 
+              backgroundColor: assistantBubbleColor,
+              borderColor: assistantBorderColor 
+            }],
           ]}
         >
           {!message.isUser && (
-            <Text style={styles.senderName}>{message.senderName}</Text>
+            <Text style={[styles.senderName, { color: senderNameColor }]}>{message.senderName}</Text>
           )}
           
           {message.isUser ? (
@@ -66,94 +163,7 @@ export default function ChatMessages({
               {message.text}
             </Text>
           ) : (
-            <Markdown
-              style={{
-                body: {
-                  color: '#000000',
-                  fontSize: 16,
-                  lineHeight: 20,
-                  margin: 0,
-                  width: '100%',
-                },
-                paragraph: {
-                  marginTop: 0,
-                  marginBottom: 8,
-                  width: '100%',
-                },
-                strong: {
-                  fontWeight: 'bold',
-                },
-                em: {
-                  fontStyle: 'italic',
-                },
-                code_inline: {
-                  backgroundColor: '#f0f0f0',
-                  padding: 2,
-                  borderRadius: 3,
-                  fontFamily: 'Courier',
-                  fontSize: 14,
-                },
-                code_block: {
-                  backgroundColor: '#f8f8f8',
-                  padding: 10,
-                  borderRadius: 5,
-                  fontFamily: 'Courier',
-                  fontSize: 14,
-                  marginVertical: 8,
-                  width: '100%',
-                },
-                blockquote: {
-                  backgroundColor: '#f9f9f9',
-                  borderLeftWidth: 4,
-                  borderLeftColor: '#ddd',
-                  paddingLeft: 10,
-                  marginVertical: 8,
-                  width: '100%',
-                },
-                list_item: {
-                  marginVertical: 2,
-                  width: '100%',
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                },
-                bullet_list: {
-                  marginVertical: 8,
-                  width: '100%',
-                },
-                ordered_list: {
-                  marginVertical: 8,
-                  width: '100%',
-                },
-                heading1: {
-                  fontSize: 20,
-                  fontWeight: 'bold',
-                  marginVertical: 8,
-                  width: '100%',
-                },
-                heading2: {
-                  fontSize: 18,
-                  fontWeight: 'bold',
-                  marginVertical: 6,
-                  width: '100%',
-                },
-                heading3: {
-                  fontSize: 16,
-                  fontWeight: 'bold',
-                  marginVertical: 4,
-                  width: '100%',
-                },
-                link: {
-                  color: '#007AFF',
-                  textDecorationLine: 'underline',
-                },
-                hr: {
-                  backgroundColor: '#ddd',
-                  height: 1,
-                  marginVertical: 10,
-                  width: '100%',
-                },
-              }}
-            >
+            <Markdown style={getMarkdownStyles() as any}>
               {message.text}
             </Markdown>
           )}
@@ -161,7 +171,7 @@ export default function ChatMessages({
           <Text
             style={[
               styles.timestamp,
-              message.isUser ? styles.userTimestamp : styles.assistantTimestamp,
+              message.isUser ? styles.userTimestamp : [styles.assistantTimestamp, { color: timestampColor }],
             ]}
           >
             {message.createdAt.toLocaleTimeString([], { 
@@ -179,12 +189,15 @@ export default function ChatMessages({
     
     return (
       <View style={[styles.messageContainer, styles.assistantMessageContainer]}>
-        <View style={[styles.messageBubble, styles.assistantBubble]}>
-          <Text style={styles.senderName}>{learningMethodName}</Text>
+        <View style={[styles.messageBubble, styles.assistantBubble, { 
+          backgroundColor: assistantBubbleColor,
+          borderColor: assistantBorderColor 
+        }]}>
+          <Text style={[styles.senderName, { color: senderNameColor }]}>{learningMethodName}</Text>
           <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>●</Text>
-            <Text style={[styles.loadingText, styles.loadingDot2]}>●</Text>
-            <Text style={[styles.loadingText, styles.loadingDot3]}>●</Text>
+            <Text style={[styles.loadingText, { color: loadingTextColor }]}>●</Text>
+            <Text style={[styles.loadingText, styles.loadingDot2, { color: loadingTextColor }]}>●</Text>
+            <Text style={[styles.loadingText, styles.loadingDot3, { color: loadingTextColor }]}>●</Text>
           </View>
         </View>
       </View>
@@ -194,7 +207,7 @@ export default function ChatMessages({
   return (
     <ScrollView
       ref={scrollViewRef}
-      style={styles.container}
+      style={[styles.container, { backgroundColor }]}
       contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
@@ -208,7 +221,6 @@ export default function ChatMessages({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   contentContainer: {
     padding: 16,
@@ -242,15 +254,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   assistantBubble: {
-    backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
   },
   senderName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
     marginBottom: 4,
   },
   messageText: {
@@ -282,7 +291,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 20,
-    color: '#666',
     marginHorizontal: 2,
   },
   loadingDot2: {
