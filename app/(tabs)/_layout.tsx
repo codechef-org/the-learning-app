@@ -65,6 +65,8 @@ export default function TabLayout() {
             backgroundColor: '#1a1a1a',
             borderTopWidth: 0,
             boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.3)',
+            height: 60,
+            zIndex: 1000,
           },
           default: {
             backgroundColor: '#1a1a1a',
