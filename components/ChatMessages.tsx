@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -54,12 +55,13 @@ export default function ChatMessages({
     body: {
       color: assistantTextColor,
       fontSize: 16,
-      lineHeight: 20,
+      lineHeight: Platform.OS === 'web' ? 24 : 20,
       margin: 0,
     },
     paragraph: {
       marginTop: 0,
-      marginBottom: 8,
+      marginBottom: Platform.OS === 'web' ? 12 : 8,
+      lineHeight: Platform.OS === 'web' ? 24 : 20,
     },
     strong: {
       fontWeight: 'bold' as 'bold',
@@ -92,15 +94,16 @@ export default function ChatMessages({
       marginVertical: 8,
     },
     list_item: {
-      marginVertical: 2,
+      marginVertical: Platform.OS === 'web' ? 6 : 2,
       flexDirection: 'row' as 'row',
       alignItems: 'flex-start' as 'flex-start',
+      lineHeight: Platform.OS === 'web' ? 24 : 20,
     },
     bullet_list: {
-      marginVertical: 8,
+      marginVertical: Platform.OS === 'web' ? 12 : 8,
     },
     ordered_list: {
-      marginVertical: 8,
+      marginVertical: Platform.OS === 'web' ? 12 : 8,
     },
     heading1: {
       fontSize: 20,
