@@ -38,8 +38,8 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Web-responsive sizing
 const isWeb = Platform.OS === 'web';
-const CARD_WIDTH = isWeb ? Math.min(screenWidth * 0.7, 600) : screenWidth * 0.9;
-const CARD_HEIGHT = isWeb ? Math.min(screenHeight * 0.7, 500) : screenHeight * 0.6;
+const CARD_WIDTH = isWeb ? Math.min(screenWidth * 0.75, 650) : screenWidth * 0.9;
+const CARD_HEIGHT = isWeb ? Math.min(screenHeight * 0.55, 420) : screenHeight * 0.6;
 
 interface Flashcard {
   id: string;
@@ -1424,39 +1424,68 @@ export default function FlashcardDeck() {
         <View style={styles.webControls}>
           {/* Show rating buttons only if user has seen the answer */}
           {(isNewCard(currentCard) || hasSeenAnswer) && (
-            <View style={styles.ratingButtons}>
-              <TouchableWithoutFeedback
-                onPress={() => submitReview(1)}
-                disabled={isReviewing}
-              >
-                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(1) }]}>
-                  <ThemedText style={styles.ratingButtonText}>1 - Again</ThemedText>
-                </View>
-              </TouchableWithoutFeedback>
-              <TouchableWithoutFeedback
-                onPress={() => submitReview(2)}
-                disabled={isReviewing}
-              >
-                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(2) }]}>
-                  <ThemedText style={styles.ratingButtonText}>2 - Hard</ThemedText>
-                </View>
-              </TouchableWithoutFeedback>
-              <TouchableWithoutFeedback
-                onPress={() => submitReview(3)}
-                disabled={isReviewing}
-              >
-                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(3) }]}>
-                  <ThemedText style={styles.ratingButtonText}>3 - Good</ThemedText>
-                </View>
-              </TouchableWithoutFeedback>
-              <TouchableWithoutFeedback
-                onPress={() => submitReview(4)}
-                disabled={isReviewing}
-              >
-                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(4) }]}>
-                  <ThemedText style={styles.ratingButtonText}>4 - Easy</ThemedText>
-                </View>
-              </TouchableWithoutFeedback>
+            <View style={styles.ratingButtonsContainer}>
+              <ThemedText style={[styles.ratingHeader, { color: textColor }]}>
+                Rate this card:
+              </ThemedText>
+              <View style={styles.ratingButtons}>
+                <TouchableWithoutFeedback
+                  onPress={() => submitReview(1)}
+                  disabled={isReviewing}
+                >
+                  <View style={[
+                    styles.ratingButton, 
+                    styles.ratingButtonAgain,
+                    isReviewing && styles.buttonDisabled
+                  ]}>
+                    <ThemedText style={styles.ratingButtonNumber}>1</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Again</ThemedText>
+                    <ThemedText style={styles.ratingButtonSubtext}>≤ 1m</ThemedText>
+                  </View>
+                </TouchableWithoutFeedback>
+                <TouchableWithoutFeedback
+                  onPress={() => submitReview(2)}
+                  disabled={isReviewing}
+                >
+                  <View style={[
+                    styles.ratingButton, 
+                    styles.ratingButtonHard,
+                    isReviewing && styles.buttonDisabled
+                  ]}>
+                    <ThemedText style={styles.ratingButtonNumber}>2</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Hard</ThemedText>
+                    <ThemedText style={styles.ratingButtonSubtext}>≤ 6m</ThemedText>
+                  </View>
+                </TouchableWithoutFeedback>
+                <TouchableWithoutFeedback
+                  onPress={() => submitReview(3)}
+                  disabled={isReviewing}
+                >
+                  <View style={[
+                    styles.ratingButton, 
+                    styles.ratingButtonGood,
+                    isReviewing && styles.buttonDisabled
+                  ]}>
+                    <ThemedText style={styles.ratingButtonNumber}>3</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Good</ThemedText>
+                    <ThemedText style={styles.ratingButtonSubtext}>≤ 10m</ThemedText>
+                  </View>
+                </TouchableWithoutFeedback>
+                <TouchableWithoutFeedback
+                  onPress={() => submitReview(4)}
+                  disabled={isReviewing}
+                >
+                  <View style={[
+                    styles.ratingButton, 
+                    styles.ratingButtonEasy,
+                    isReviewing && styles.buttonDisabled
+                  ]}>
+                    <ThemedText style={styles.ratingButtonNumber}>4</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Easy</ThemedText>
+                    <ThemedText style={styles.ratingButtonSubtext}>≤ 4d</ThemedText>
+                  </View>
+                </TouchableWithoutFeedback>
+              </View>
             </View>
           )}
           
@@ -1465,17 +1494,20 @@ export default function FlashcardDeck() {
             <View style={styles.flipButtonContainer}>
               <TouchableWithoutFeedback onPress={flipCard}>
                 <View style={[styles.flipButton, { backgroundColor: tintColor }]}>
-                  <ThemedText style={styles.ratingButtonText}>👁️ Show Answer (Space/Enter)</ThemedText>
+                  <ThemedText style={styles.flipButtonIcon}>👁️</ThemedText>
+                  <ThemedText style={styles.flipButtonText}>Show Answer</ThemedText>
+                  <ThemedText style={styles.flipButtonSubtext}>Space or Enter</ThemedText>
                 </View>
               </TouchableWithoutFeedback>
             </View>
           )}
 
-          {/* Delete button */}
-          <View style={styles.deleteButtonContainer}>
+          {/* Action buttons row */}
+          <View style={styles.actionButtonsRow}>
             <TouchableWithoutFeedback onPress={handleLongPress}>
               <View style={styles.deleteButton}>
-                <ThemedText style={styles.deleteButtonText}>🗑️ Delete (Ctrl+Del)</ThemedText>
+                <ThemedText style={styles.deleteButtonIcon}>🗑️</ThemedText>
+                <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
               </View>
             </TouchableWithoutFeedback>
           </View>
@@ -1483,14 +1515,14 @@ export default function FlashcardDeck() {
       )}
 
       <View style={styles.instructions}>
-        <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
+        <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.7 }]}>
           {isWeb ? (
             // Web instructions
             isNewCard(currentCard) 
-              ? "New card - both sides shown • Use buttons or keys 1-4 to rate"
+              ? "📚 New card - study both sides and rate your understanding"
               : hasSeenAnswer
-                ? "Use buttons or keys 1-4 to rate: 1=Again, 2=Hard, 3=Good, 4=Easy"
-                : "Click 'Show Answer' or press Space/Enter to flip"
+                ? "⭐ Rate how well you knew this answer"
+                : "👁️ Click to reveal the answer and test your knowledge"
           ) : (
             // Mobile instructions
             isNewCard(currentCard) 
@@ -1498,8 +1530,8 @@ export default function FlashcardDeck() {
               : "Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
           )}
         </ThemedText>
-        <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.4 }]}>
-          {isWeb ? "Keyboard shortcuts: 1-4 to rate, Space/Enter to flip, Ctrl+Del to delete" : "Long press to delete"}
+        <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.5 }]}>
+          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip • Ctrl+Del to delete" : "Long press to delete"}
         </ThemedText>
       </View>
     </ThemedView>
@@ -1510,7 +1542,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: 20,
+    paddingTop: isWeb ? 24 : 20,
+    paddingBottom: isWeb ? 24 : 0,
+    paddingHorizontal: isWeb ? 16 : 0,
+    maxWidth: isWeb ? 800 : undefined,
+    alignSelf: 'center',
+    width: '100%',
+    justifyContent: isWeb ? 'flex-start' : 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -1544,7 +1582,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: CARD_WIDTH,
-    marginBottom: 20,
+    marginBottom: isWeb ? 24 : 20,
+    paddingHorizontal: isWeb ? 8 : 0,
   },
   headerLeft: {
     flex: 1,
@@ -1578,14 +1617,16 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backfaceVisibility: 'hidden',
-    borderRadius: 20,
+    borderRadius: isWeb ? 16 : 20,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: isWeb ? 8 : 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOpacity: isWeb ? 0.12 : 0.15,
+    shadowRadius: isWeb ? 16 : 12,
     elevation: 8,
+    borderWidth: isWeb ? 1 : 0,
+    borderColor: isWeb ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
   },
   cardBack: {
     position: 'absolute',
@@ -1594,9 +1635,10 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     flex: 1,
-    padding: 24,
+    padding: isWeb ? 32 : 24,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: '100%',
   },
   cardTypeText: {
     position: 'absolute',
@@ -1614,10 +1656,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardText: {
-    fontSize: 18,
-    lineHeight: 28,
+    fontSize: isWeb ? 20 : 18,
+    lineHeight: isWeb ? 32 : 28,
     textAlign: 'center',
     fontWeight: '500',
+    maxWidth: '100%',
+    overflow: 'visible',
   },
   clozeContainer: {
     alignItems: 'center',
@@ -1628,17 +1672,22 @@ const styles = StyleSheet.create({
   },
 
   instructions: {
-    marginTop: 40,
-    paddingHorizontal: 20,
+    marginTop: isWeb ? 32 : 40,
+    paddingHorizontal: isWeb ? 32 : 20,
+    maxWidth: isWeb ? 600 : undefined,
+    alignSelf: 'center',
   },
   instructionText: {
-    fontSize: 14,
+    fontSize: isWeb ? 16 : 14,
     textAlign: 'center',
+    lineHeight: isWeb ? 24 : 20,
+    fontWeight: '500',
   },
   instructionSubtext: {
-    fontSize: 12,
+    fontSize: isWeb ? 13 : 12,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: isWeb ? 8 : 4,
+    lineHeight: isWeb ? 18 : 16,
   },
   clozeTextContainer: {
     flexDirection: 'row',
@@ -1793,47 +1842,131 @@ const styles = StyleSheet.create({
   },
   // Web-specific styles
   webControls: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: 'center',
     width: CARD_WIDTH,
+    paddingHorizontal: 16,
+  },
+  ratingButtonsContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  ratingHeader: {
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 16,
+    opacity: 0.9,
   },
   ratingButtons: {
     flexDirection: 'row',
     gap: 12,
-    flexWrap: 'wrap',
     justifyContent: 'center',
     marginBottom: 16,
   },
   ratingButton: {
-    minWidth: 100,
-    borderRadius: 8,
+    minWidth: 110,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  ratingButtonAgain: {
+    backgroundColor: '#ef4444',
+  },
+  ratingButtonHard: {
+    backgroundColor: '#f97316',
+  },
+  ratingButtonGood: {
+    backgroundColor: '#10b981',
+  },
+  ratingButtonEasy: {
+    backgroundColor: '#3b82f6',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  ratingButtonNumber: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  ratingButtonLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  ratingButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    fontWeight: '500',
   },
   flipButtonContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
+    width: '100%',
+    alignItems: 'center',
   },
   flipButton: {
-    borderRadius: 8,
-    paddingHorizontal: 24,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    minWidth: 200,
   },
-  deleteButtonContainer: {
-    marginTop: 8,
+  flipButtonIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  flipButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  flipButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 16,
   },
   deleteButton: {
     borderColor: '#ef4444',
     borderRadius: 8,
     borderWidth: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    backgroundColor: 'transparent',
   },
-  ratingButtonText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 14,
+  deleteButtonIcon: {
+    fontSize: 16,
+    marginRight: 6,
   },
   deleteButtonText: {
     color: '#ef4444',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: 14,
   },
 });

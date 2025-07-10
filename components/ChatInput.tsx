@@ -1,10 +1,11 @@
+import { useColorScheme } from '@/hooks/useColorScheme';
 import React, { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 interface ChatInputProps {
@@ -19,6 +20,16 @@ export default function ChatInput({
   disabled = false
 }: ChatInputProps) {
   const [message, setMessage] = useState('');
+  const colorScheme = useColorScheme();
+
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#FFFFFF';
+  const borderColor = isDark ? '#333333' : '#e0e0e0';
+  const inputBackgroundColor = isDark ? '#2c2c2c' : '#f8f9fa';
+  const inputBorderColor = isDark ? '#444444' : '#e0e0e0';
+  const textColor = isDark ? '#ffffff' : '#000';
+  const placeholderColor = isDark ? '#999999' : '#999';
 
   const handleSend = () => {
     const trimmedMessage = message.trim();
@@ -31,20 +42,25 @@ export default function ChatInput({
   const canSend = message.trim().length > 0 && !disabled;
 
   return (
-    <View style={styles.container}>
-      <View style={[
-        styles.inputContainer,
-      ]}>
-        <View style={styles.inputWrapper}>
+    <View style={[styles.container, { backgroundColor, borderTopColor: borderColor }]}>
+      <View style={styles.inputContainer}>
+        <View style={[
+          styles.inputWrapper,
+          { 
+            backgroundColor: inputBackgroundColor,
+            borderColor: inputBorderColor 
+          }
+        ]}>
           <TextInput
             style={[
               styles.textInput,
+              { color: textColor },
               disabled && styles.textInputDisabled,
             ]}
             value={message}
             onChangeText={setMessage}
             placeholder={placeholder}
-            placeholderTextColor="#999"
+            placeholderTextColor={placeholderColor}
             multiline
             maxLength={1000}
             editable={!disabled}
@@ -77,9 +93,7 @@ export default function ChatInput({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   inputContainer: {
     paddingHorizontal: 16,
@@ -88,10 +102,8 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    backgroundColor: '#f8f9fa',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
     paddingLeft: 16,
     paddingRight: 4,
     paddingVertical: 4,
@@ -104,7 +116,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
     paddingVertical: 12,
     paddingRight: 8,
-    color: '#000',
   },
   textInputDisabled: {
     color: '#999',

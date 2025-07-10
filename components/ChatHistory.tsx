@@ -1,3 +1,4 @@
+import { useColorScheme } from '@/hooks/useColorScheme';
 import React, { useEffect, useState } from 'react';
 import {
     Alert,
@@ -34,6 +35,15 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const colorScheme = useColorScheme();
+
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#f8f9fa';
+  const cardBackgroundColor = isDark ? '#2c2c2c' : '#ffffff';
+  const textColor = isDark ? '#ffffff' : '#1a1a1a';
+  const subtitleColor = isDark ? '#cccccc' : '#666';
+  const dateColor = isDark ? '#999999' : '#999';
 
   useEffect(() => {
     if (user) {
@@ -150,17 +160,24 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
 
   const renderChatItem = ({ item }: { item: Chat }) => (
     <TouchableOpacity
-      style={[styles.chatCard, { borderLeftColor: item.learning_method.color }]}
+      style={[
+        styles.chatCard, 
+        { 
+          borderLeftColor: item.learning_method.color,
+          backgroundColor: cardBackgroundColor,
+          shadowColor: isDark ? '#000' : '#000',
+        }
+      ]}
       onPress={() => onChatSelect(item)}
     >
       <View style={styles.chatHeader}>
         <View style={styles.chatTitleRow}>
           <Text style={styles.chatIcon}>{getIcon(item.learning_method.icon)}</Text>
           <View style={styles.chatInfo}>
-            <Text style={styles.chatTitle} numberOfLines={1}>
+            <Text style={[styles.chatTitle, { color: textColor }]} numberOfLines={1}>
               {item.topic}
             </Text>
-            <Text style={styles.chatMethod} numberOfLines={1}>
+            <Text style={[styles.chatMethod, { color: subtitleColor }]} numberOfLines={1}>
               {item.learning_method.name}
             </Text>
           </View>
@@ -170,7 +187,7 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
             </View>
           </View>
         </View>
-        <Text style={styles.chatDate}>{formatDate(item.updated_at)}</Text>
+        <Text style={[styles.chatDate, { color: dateColor }]}>{formatDate(item.updated_at)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -178,7 +195,7 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading chat history...</Text>
+        <Text style={[styles.loadingText, { color: subtitleColor }]}>Loading chat history...</Text>
       </View>
     );
   }
@@ -187,8 +204,8 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyIcon}>💬</Text>
-        <Text style={styles.emptyTitle}>No chats yet</Text>
-        <Text style={styles.emptySubtitle}>
+        <Text style={[styles.emptyTitle, { color: textColor }]}>No chats yet</Text>
+        <Text style={[styles.emptySubtitle, { color: subtitleColor }]}>
           Start your first learning session to begin your journey
         </Text>
       </View>
@@ -197,7 +214,7 @@ export default function ChatHistory({ onChatSelect }: ChatHistoryProps) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Recent Chats</Text>
+      <Text style={[styles.sectionTitle, { color: textColor }]}>Recent Chats</Text>
       <View style={styles.listContainer}>
         {chats.map((item) => (
           <View key={item.id}>
@@ -216,7 +233,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 16,
     paddingHorizontal: 20,
   },
@@ -224,12 +240,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   chatCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
@@ -256,12 +270,10 @@ const styles = StyleSheet.create({
   chatTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 2,
   },
   chatMethod: {
     fontSize: 14,
-    color: '#666',
   },
   statusContainer: {
     marginLeft: 8,
@@ -278,7 +290,6 @@ const styles = StyleSheet.create({
   },
   chatDate: {
     fontSize: 12,
-    color: '#999',
     textAlign: 'left',
   },
   loadingContainer: {
@@ -287,7 +298,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
   },
   emptyContainer: {
     padding: 40,
@@ -300,12 +310,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#666',
     textAlign: 'center',
     paddingHorizontal: 20,
     lineHeight: 20,

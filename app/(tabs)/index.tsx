@@ -3,6 +3,7 @@ import ChatScreen from '@/components/ChatScreen';
 import LearningMethodsList from '@/components/LearningMethodsList';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { useNavigation } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
@@ -48,6 +49,15 @@ export default function LearnScreen() {
   const [showLearningMethods, setShowLearningMethods] = useState(false);
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const colorScheme = useColorScheme();
+
+  // Theme colors
+  const isDark = colorScheme === 'dark';
+  const backgroundColor = isDark ? '#121212' : '#ffffff';
+  const headerBackgroundColor = isDark ? '#1f1f1f' : '#f8f9fa';
+  const headerBorderColor = isDark ? '#333333' : '#e9ecef';
+  const sessionTitleColor = isDark ? '#ffffff' : '#1a1a1a';
+  const sessionTopicColor = isDark ? '#cccccc' : '#6c757d';
 
   // Dynamic header control based on chat state
   useEffect(() => {
@@ -106,9 +116,16 @@ export default function LearnScreen() {
 
   if (!showStartScreen && currentSession) {
     return (
-      <View style={styles.container}>
-        <StatusBar style="dark" />
-        <View style={[styles.sessionHeader, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { backgroundColor }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <View style={[
+          styles.sessionHeader, 
+          { 
+            paddingTop: insets.top,
+            backgroundColor: headerBackgroundColor,
+            borderBottomColor: headerBorderColor,
+          }
+        ]}>
           <IconButton
             icon="arrow-left"
             mode="contained"
@@ -117,11 +134,11 @@ export default function LearnScreen() {
             style={[styles.backButton, { backgroundColor: '#667eea' }]}
           />
           <View style={styles.sessionInfo}>
-            <ThemedText type="defaultSemiBold" style={styles.sessionTitle}>
+            <ThemedText type="defaultSemiBold" style={[styles.sessionTitle, { color: sessionTitleColor }]}>
               {currentSession.learning_method.name}
             </ThemedText>
             <ThemedText 
-              style={styles.sessionTopic}
+              style={[styles.sessionTopic, { color: sessionTopicColor }]}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
@@ -140,7 +157,7 @@ export default function LearnScreen() {
           </Button>
         </View>
         
-        <View style={styles.chatContainer}>
+        <View style={[styles.chatContainer, { backgroundColor }]}>
           <ChatScreen
             chatId={currentSession.id}
             systemPrompt={currentSession.learning_method.system_prompt}
@@ -222,7 +239,6 @@ export default function LearnScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   scrollContainer: {
     flex: 1,
@@ -252,9 +268,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   sessionInfo: {
     flex: 1,
@@ -263,11 +277,9 @@ const styles = StyleSheet.create({
   },
   sessionTitle: {
     fontSize: 16,
-    color: '#1a1a1a',
   },
   sessionTopic: {
     fontSize: 12,
-    color: '#6c757d',
     marginTop: 2,
   },
   backButton: {
@@ -325,6 +337,5 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
 });
