@@ -1,3 +1,14 @@
+/**
+ * FlashcardDeck Component - FSRS Spaced Repetition System
+ * 
+ * Features:
+ * - NEW CARDS: Shows both front and back simultaneously for learning
+ * - REVIEW CARDS: Traditional flip behavior for testing recall
+ * - FSRS Algorithm: Scientific spaced repetition scheduling
+ * - Swipe Gestures: Rate cards with directional swipes
+ * - Animations: Smooth card transitions and feedback
+ */
+
 import { useAuth } from '@/context/AuthContext';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { supabase } from '@/lib/supabase';
@@ -99,6 +110,11 @@ export default function FlashcardDeck() {
   const cardFrontColor = useThemeColor({ light: '#ffffff', dark: '#1f2937' }, 'background');
   const cardBackColor = useThemeColor({ light: '#f8f9fa', dark: '#374151' }, 'background');
   const shadowColor = useThemeColor({ light: '#000000', dark: '#000000' }, 'text');
+
+  // Helper function to identify new cards
+  const isNewCard = useCallback((card: Flashcard): boolean => {
+    return !card.state || card.state === 'NEW';
+  }, []);
   
   // Animation values
   const flipValue = useRef(new Animated.Value(0)).current;
@@ -181,6 +197,15 @@ export default function FlashcardDeck() {
       fetchMoreFlashcards();
     }
   }, [currentIndex, flashcards.length]);
+
+  // Handle hasSeenAnswer state when the current card changes
+  useEffect(() => {
+    if (flashcards.length > 0 && currentIndex < flashcards.length) {
+      const currentCard = flashcards[currentIndex];
+      // For new cards, user can see the answer immediately
+      setHasSeenAnswer(isNewCard(currentCard));
+    }
+  }, [currentIndex, flashcards, isNewCard]);
 
   const deleteFlashcard = async (flashcardId: string) => {
     if (!user) return;
@@ -387,6 +412,11 @@ export default function FlashcardDeck() {
 
 
   const flipCard = useCallback(() => {
+    // Prevent flipping for new cards since they already show both sides
+    if (flashcards.length > 0 && currentIndex < flashcards.length && isNewCard(flashcards[currentIndex])) {
+      return;
+    }
+    
     const animation = Animated.timing(flipValue, {
       toValue: isFlipped ? 0 : 1,
       ...ANIMATION_CONFIG.TIMING_SLOW,
@@ -399,7 +429,7 @@ export default function FlashcardDeck() {
     if (!isFlipped) {
       setHasSeenAnswer(true);
     }
-  }, [isFlipped, flipValue, addAnimation]);
+  }, [isFlipped, flipValue, addAnimation, flashcards, currentIndex, isNewCard]);
 
   const resetCardPosition = useCallback(() => {
     // Stop any running animations first
@@ -417,8 +447,14 @@ export default function FlashcardDeck() {
     setIsFlipped(false);
     setPreviewRating(null);
     setSelectedRating(null);
-    setHasSeenAnswer(false);
-  }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations]);
+    
+    // For new cards, they can see the answer immediately, so set hasSeenAnswer to true
+    if (flashcards.length > 0 && currentIndex < flashcards.length) {
+      setHasSeenAnswer(isNewCard(flashcards[currentIndex]));
+    } else {
+      setHasSeenAnswer(false);
+    }
+  }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations, flashcards, currentIndex, isNewCard]);
 
   const nextCard = useCallback((rating?: number) => {
     // Clear rating state immediately before starting transition
@@ -478,10 +514,15 @@ export default function FlashcardDeck() {
       // Update to next card (or completion screen if this was the last card)
       setCurrentIndex(prev => prev + 1);
       setIsFlipped(false);
-      setHasSeenAnswer(false);
       
       // Only reset and animate in new card if there's a next card
       if (currentIndex < flashcards.length - 1) {
+        const nextCardIndex = currentIndex + 1;
+        const nextCard = flashcards[nextCardIndex];
+        
+        // Set hasSeenAnswer based on whether the next card is new
+        setHasSeenAnswer(isNewCard(nextCard));
+        
         // Reset animation values instantly (off-screen)
         translateX.setValue(-screenWidth * 0.3);
         translateY.setValue(0);
@@ -497,6 +538,8 @@ export default function FlashcardDeck() {
         );
         
         addAnimation(entranceAnimation).start();
+      } else {
+        setHasSeenAnswer(false);
       }
     });
   }, [
@@ -578,6 +621,7 @@ export default function FlashcardDeck() {
     scale.setValue(scaleValue);
     
     // Throttled rating preview updates (only when needed)
+    // For new cards, hasSeenAnswer is true, so they can show rating previews immediately
     if (hasSeenAnswer && !isReviewing) {
       const absX = Math.abs(translationX);
       const absY = Math.abs(translationY);
@@ -663,8 +707,12 @@ export default function FlashcardDeck() {
     if (event.nativeEvent.state === State.END) {
       const { translationX, translationY, velocityX } = event.nativeEvent;
       
+      const currentCard = flashcards[currentIndex];
+      const isCurrentCardNew = currentCard && isNewCard(currentCard);
+      
       // Check if user has seen the answer before allowing rating
-      if (!hasSeenAnswer) {
+      // For new cards, hasSeenAnswer is already true, so they can rate immediately
+      if (!hasSeenAnswer && !isCurrentCardNew) {
         // User hasn't seen the answer yet, show the back side instead of rating
         const shouldFlip = Math.abs(translationX) > gestureThresholds.position || 
                           Math.abs(velocityX) > gestureThresholds.velocity;
@@ -751,7 +799,43 @@ export default function FlashcardDeck() {
     nextCard
   ]);
 
-  const renderFlashcardContent = (card: Flashcard, side: 'front' | 'back') => {
+  const renderNewCardLayout = (card: Flashcard) => {
+    return (
+      <View style={styles.newCardContainer}>
+        <View style={styles.newCardSection}>
+          <View style={styles.newCardHeader}>
+            <ThemedText style={[styles.newCardLabel, { color: tintColor }]}>
+              QUESTION
+            </ThemedText>
+            <View style={[styles.newCardBadge, { backgroundColor: tintColor }]}>
+              <ThemedText style={[styles.newCardBadgeText, { color: backgroundColor }]}>
+                NEW
+              </ThemedText>
+            </View>
+          </View>
+          <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
+            {card.type.toUpperCase()}
+          </ThemedText>
+          <View style={styles.newCardContent}>
+            {renderFlashcardContent(card, 'front', true)}
+          </View>
+        </View>
+        
+        <View style={[styles.newCardDivider, { backgroundColor: textColor }]} />
+        
+        <View style={styles.newCardSection}>
+          <ThemedText style={[styles.newCardLabel, { color: tintColor }]}>
+            ANSWER
+          </ThemedText>
+          <View style={styles.newCardContent}>
+            {renderFlashcardContent(card, 'back', true)}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderFlashcardContent = (card: Flashcard, side: 'front' | 'back', isNewCardLayout: boolean = false) => {
     const content = side === 'front' ? card.front : card.back;
     
     // Handle cloze cards specially
@@ -824,13 +908,17 @@ export default function FlashcardDeck() {
       const cleanContent = content.replace(/\{\{c\d+::(.*?)\}\}/g, '$1');
       
       return (
-        <View style={styles.cardContent}>
-          <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
-            {card.type.toUpperCase()}
-          </ThemedText>
-          <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
-            ANSWER
-          </ThemedText>
+        <View style={isNewCardLayout ? undefined : styles.cardContent}>
+          {!isNewCardLayout && (
+            <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
+              {card.type.toUpperCase()}
+            </ThemedText>
+          )}
+          {!isNewCardLayout && (
+            <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
+              ANSWER
+            </ThemedText>
+          )}
           <ThemedText style={[styles.cardText, { color: textColor }]}>{cleanContent}</ThemedText>
         </View>
       );
@@ -839,13 +927,17 @@ export default function FlashcardDeck() {
     // Handle back side for all other card types
     if (side === 'back') {
       return (
-        <View style={styles.cardContent}>
-          <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
-            {card.type.toUpperCase()}
-          </ThemedText>
-          <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
-            ANSWER
-          </ThemedText>
+        <View style={isNewCardLayout ? undefined : styles.cardContent}>
+          {!isNewCardLayout && (
+            <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
+              {card.type.toUpperCase()}
+            </ThemedText>
+          )}
+          {!isNewCardLayout && (
+            <ThemedText style={[styles.answerLabel, { color: tintColor }]}>
+              ANSWER
+            </ThemedText>
+          )}
           <ThemedText style={[styles.cardText, { color: textColor }]}>{content}</ThemedText>
         </View>
       );
@@ -853,10 +945,12 @@ export default function FlashcardDeck() {
     
     // Front side (default case)
     return (
-      <View style={styles.cardContent}>
-        <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
-          {card.type.toUpperCase()}
-        </ThemedText>
+      <View style={isNewCardLayout ? undefined : styles.cardContent}>
+        {!isNewCardLayout && (
+          <ThemedText style={[styles.cardTypeText, { color: textColor, opacity: 0.5 }]}>
+            {card.type.toUpperCase()}
+          </ThemedText>
+        )}
         <ThemedText style={[styles.cardText, { color: textColor }]}>{content}</ThemedText>
       </View>
     );
@@ -1107,34 +1201,53 @@ export default function FlashcardDeck() {
                     </Animated.View>
                   )}
 
-                  {/* Front of card */}
-                  <Animated.View
-                    style={[
-                      styles.cardFace,
-                      { 
-                        backgroundColor: cardFrontColor,
-                        shadowColor: shadowColor,
-                      },
-                      frontAnimatedStyle,
-                    ]}
-                  >
-                    {renderFlashcardContent(currentCard, 'front')}
-                  </Animated.View>
+                  {/* Render new card layout or traditional flip card */}
+                  {isNewCard(currentCard) ? (
+                    // New card: show both sides simultaneously
+                    <View
+                      style={[
+                        styles.cardFace,
+                        { 
+                          backgroundColor: cardFrontColor,
+                          shadowColor: shadowColor,
+                        },
+                      ]}
+                    >
+                      {renderNewCardLayout(currentCard)}
+                    </View>
+                  ) : (
+                    // Review card: traditional flip behavior
+                    <>
+                      {/* Front of card */}
+                      <Animated.View
+                        style={[
+                          styles.cardFace,
+                          { 
+                            backgroundColor: cardFrontColor,
+                            shadowColor: shadowColor,
+                          },
+                          frontAnimatedStyle,
+                        ]}
+                      >
+                        {renderFlashcardContent(currentCard, 'front')}
+                      </Animated.View>
 
-                  {/* Back of card */}
-                  <Animated.View
-                    style={[
-                      styles.cardFace,
-                      styles.cardBack,
-                      { 
-                        backgroundColor: cardBackColor,
-                        shadowColor: shadowColor,
-                      },
-                      backAnimatedStyle,
-                    ]}
-                  >
-                    {renderFlashcardContent(currentCard, 'back')}
-                  </Animated.View>
+                      {/* Back of card */}
+                      <Animated.View
+                        style={[
+                          styles.cardFace,
+                          styles.cardBack,
+                          { 
+                            backgroundColor: cardBackColor,
+                            shadowColor: shadowColor,
+                          },
+                          backAnimatedStyle,
+                        ]}
+                      >
+                        {renderFlashcardContent(currentCard, 'back')}
+                      </Animated.View>
+                    </>
+                  )}
                 </View>
               </TouchableWithoutFeedback>
             </Animated.View>
@@ -1144,7 +1257,10 @@ export default function FlashcardDeck() {
 
       <View style={styles.instructions}>
         <ThemedText style={[styles.instructionText, { color: textColor, opacity: 0.6 }]}>
-          Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy
+          {isNewCard(currentCard) 
+            ? "New card - both sides shown • Swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
+            : "Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
+          }
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.4 }]}>
           Long press to delete
@@ -1394,5 +1510,49 @@ const styles = StyleSheet.create({
   refreshButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  // New card layout styles
+  newCardContainer: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  newCardSection: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: '40%',
+  },
+  newCardLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  newCardContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  newCardDivider: {
+    height: 1,
+    marginVertical: 16,
+    opacity: 0.2,
+  },
+  newCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  newCardBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  newCardBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });
