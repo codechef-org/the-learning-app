@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
           .eq('user_id', user.id)
           .eq('is_deleted', false)
           .eq('state', 'NEW')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: true })
           .limit(remainingSlots);
 
         if (newError) {
