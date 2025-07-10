@@ -214,6 +214,67 @@ export default function FlashcardDeck() {
     }
   }, [currentIndex, flashcards, isNewCard]);
 
+  // Keyboard shortcuts for web - must be at top level with other hooks
+  useEffect(() => {
+    if (!isWeb || typeof window === 'undefined') return;
+
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (currentIndex >= flashcards.length || isReviewing) return;
+
+      const currentCard = flashcards[currentIndex];
+      if (!currentCard) return;
+
+      // Don't handle keys if user hasn't seen the answer for review cards
+      if (!isNewCard(currentCard) && !hasSeenAnswer) {
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault();
+          if (typeof flipCard === 'function') flipCard();
+        }
+        return;
+      }
+
+      switch (event.key) {
+        case '1':
+          event.preventDefault();
+          if (typeof submitReview === 'function') submitReview(1);
+          break;
+        case '2':
+          event.preventDefault();
+          if (typeof submitReview === 'function') submitReview(2);
+          break;
+        case '3':
+          event.preventDefault();
+          if (typeof submitReview === 'function') submitReview(3);
+          break;
+        case '4':
+          event.preventDefault();
+          if (typeof submitReview === 'function') submitReview(4);
+          break;
+        case ' ':
+        case 'Enter':
+          event.preventDefault();
+          if (!isNewCard(currentCard) && typeof flipCard === 'function') {
+            flipCard();
+          }
+          break;
+        case 'Delete':
+        case 'Backspace':
+          if (event.ctrlKey || event.metaKey) {
+            event.preventDefault();
+            if (typeof handleLongPress === 'function') handleLongPress();
+          }
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [currentIndex, flashcards, isReviewing, hasSeenAnswer, isNewCard]);
+
+
+
   const deleteFlashcard = async (flashcardId: string) => {
     if (!user) return;
 
@@ -250,7 +311,7 @@ export default function FlashcardDeck() {
     }
   };
 
-  const handleLongPress = () => {
+  const handleLongPress = useCallback(() => {
     if (isDeleting || currentIndex >= flashcards.length) return;
     
     const currentCard = flashcards[currentIndex];
@@ -280,7 +341,7 @@ export default function FlashcardDeck() {
         },
       ]
     );
-  };
+  }, [isDeleting, currentIndex, flashcards, deleteFlashcard]);
 
   const onLongPressStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.ACTIVE) {
@@ -1085,65 +1146,6 @@ export default function FlashcardDeck() {
     }
   };
 
-  // Keyboard shortcuts for web
-  useEffect(() => {
-    if (!isWeb) return;
-
-    const handleKeyPress = (event: KeyboardEvent) => {
-      if (currentIndex >= flashcards.length || isReviewing) return;
-
-      const currentCard = flashcards[currentIndex];
-      if (!currentCard) return;
-
-      // Don't handle keys if user hasn't seen the answer for review cards
-      if (!isNewCard(currentCard) && !hasSeenAnswer) {
-        if (event.key === ' ' || event.key === 'Enter') {
-          event.preventDefault();
-          flipCard();
-        }
-        return;
-      }
-
-      switch (event.key) {
-        case '1':
-          event.preventDefault();
-          submitReview(1); // Again
-          break;
-        case '2':
-          event.preventDefault();
-          submitReview(2); // Hard
-          break;
-        case '3':
-          event.preventDefault();
-          submitReview(3); // Good
-          break;
-        case '4':
-          event.preventDefault();
-          submitReview(4); // Easy
-          break;
-        case ' ':
-        case 'Enter':
-          event.preventDefault();
-          if (!isNewCard(currentCard)) {
-            flipCard();
-          }
-          break;
-        case 'Delete':
-        case 'Backspace':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            handleLongPress();
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => {
-      window.removeEventListener('keydown', handleKeyPress);
-    };
-  }, [currentIndex, flashcards, isReviewing, hasSeenAnswer, isNewCard, flipCard, submitReview, handleLongPress]);
-
   const restartDeck = () => {
     // Refetch cards to get fresh due cards with FSRS prioritization
     fetchFlashcards();
@@ -1423,76 +1425,59 @@ export default function FlashcardDeck() {
           {/* Show rating buttons only if user has seen the answer */}
           {(isNewCard(currentCard) || hasSeenAnswer) && (
             <View style={styles.ratingButtons}>
-              <Button
-                mode="contained"
+              <TouchableWithoutFeedback
                 onPress={() => submitReview(1)}
-                style={[styles.ratingButton, { backgroundColor: getRatingColor(1) }]}
-                textColor="#ffffff"
                 disabled={isReviewing}
-                compact
               >
-                1 - Again
-              </Button>
-              <Button
-                mode="contained"
+                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(1) }]}>
+                  <ThemedText style={styles.ratingButtonText}>1 - Again</ThemedText>
+                </View>
+              </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback
                 onPress={() => submitReview(2)}
-                style={[styles.ratingButton, { backgroundColor: getRatingColor(2) }]}
-                textColor="#ffffff"
                 disabled={isReviewing}
-                compact
               >
-                2 - Hard
-              </Button>
-              <Button
-                mode="contained"
+                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(2) }]}>
+                  <ThemedText style={styles.ratingButtonText}>2 - Hard</ThemedText>
+                </View>
+              </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback
                 onPress={() => submitReview(3)}
-                style={[styles.ratingButton, { backgroundColor: getRatingColor(3) }]}
-                textColor="#ffffff"
                 disabled={isReviewing}
-                compact
               >
-                3 - Good
-              </Button>
-              <Button
-                mode="contained"
+                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(3) }]}>
+                  <ThemedText style={styles.ratingButtonText}>3 - Good</ThemedText>
+                </View>
+              </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback
                 onPress={() => submitReview(4)}
-                style={[styles.ratingButton, { backgroundColor: getRatingColor(4) }]}
-                textColor="#ffffff"
                 disabled={isReviewing}
-                compact
               >
-                4 - Easy
-              </Button>
+                <View style={[styles.ratingButton, { backgroundColor: getRatingColor(4) }]}>
+                  <ThemedText style={styles.ratingButtonText}>4 - Easy</ThemedText>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
           )}
           
           {/* Show flip button for review cards when answer not seen */}
           {!isNewCard(currentCard) && !hasSeenAnswer && (
             <View style={styles.flipButtonContainer}>
-              <Button
-                mode="contained"
-                onPress={flipCard}
-                style={[styles.flipButton, { backgroundColor: tintColor }]}
-                textColor="#ffffff"
-                icon="eye"
-              >
-                Show Answer (Space/Enter)
-              </Button>
+              <TouchableWithoutFeedback onPress={flipCard}>
+                <View style={[styles.flipButton, { backgroundColor: tintColor }]}>
+                  <ThemedText style={styles.ratingButtonText}>👁️ Show Answer (Space/Enter)</ThemedText>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
           )}
 
           {/* Delete button */}
           <View style={styles.deleteButtonContainer}>
-            <Button
-              mode="outlined"
-              onPress={handleLongPress}
-              style={styles.deleteButton}
-              textColor="#ef4444"
-              icon="delete"
-              compact
-            >
-              Delete (Ctrl+Del)
-            </Button>
+            <TouchableWithoutFeedback onPress={handleLongPress}>
+              <View style={styles.deleteButton}>
+                <ThemedText style={styles.deleteButtonText}>🗑️ Delete (Ctrl+Del)</ThemedText>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
         </View>
       )}
@@ -1836,5 +1821,19 @@ const styles = StyleSheet.create({
   deleteButton: {
     borderColor: '#ef4444',
     borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  ratingButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  deleteButtonText: {
+    color: '#ef4444',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
