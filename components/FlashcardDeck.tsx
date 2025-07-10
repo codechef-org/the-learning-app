@@ -1440,7 +1440,6 @@ export default function FlashcardDeck() {
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>1</ThemedText>
                     <ThemedText style={styles.ratingButtonLabel}>Again</ThemedText>
-                    <ThemedText style={styles.ratingButtonSubtext}>≤ 1m</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1454,7 +1453,6 @@ export default function FlashcardDeck() {
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>2</ThemedText>
                     <ThemedText style={styles.ratingButtonLabel}>Hard</ThemedText>
-                    <ThemedText style={styles.ratingButtonSubtext}>≤ 6m</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1468,7 +1466,6 @@ export default function FlashcardDeck() {
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>3</ThemedText>
                     <ThemedText style={styles.ratingButtonLabel}>Good</ThemedText>
-                    <ThemedText style={styles.ratingButtonSubtext}>≤ 10m</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1482,7 +1479,6 @@ export default function FlashcardDeck() {
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>4</ThemedText>
                     <ThemedText style={styles.ratingButtonLabel}>Easy</ThemedText>
-                    <ThemedText style={styles.ratingButtonSubtext}>≤ 4d</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
               </View>
@@ -1493,24 +1489,15 @@ export default function FlashcardDeck() {
           {!isNewCard(currentCard) && !hasSeenAnswer && (
             <View style={styles.flipButtonContainer}>
               <TouchableWithoutFeedback onPress={flipCard}>
-                <View style={[styles.flipButton, { backgroundColor: tintColor }]}>
-                  <ThemedText style={styles.flipButtonIcon}>👁️</ThemedText>
-                  <ThemedText style={styles.flipButtonText}>Show Answer</ThemedText>
-                  <ThemedText style={styles.flipButtonSubtext}>Space or Enter</ThemedText>
+                <View style={[styles.flipButton, { backgroundColor: '#3b82f6' }]}>
+                  <ThemedText style={[styles.flipButtonText, { color: '#ffffff' }]}>Show Answer</ThemedText>
+                  <ThemedText style={[styles.flipButtonSubtext, { color: 'rgba(255, 255, 255, 0.8)' }]}>Space or Enter</ThemedText>
                 </View>
               </TouchableWithoutFeedback>
             </View>
           )}
 
-          {/* Action buttons row */}
-          <View style={styles.actionButtonsRow}>
-            <TouchableWithoutFeedback onPress={handleLongPress}>
-              <View style={styles.deleteButton}>
-                <ThemedText style={styles.deleteButtonIcon}>🗑️</ThemedText>
-                <ThemedText style={styles.deleteButtonText}>Delete</ThemedText>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
+
         </View>
       )}
 
@@ -1531,7 +1518,7 @@ export default function FlashcardDeck() {
           )}
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.5 }]}>
-          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip • Ctrl+Del to delete" : "Long press to delete"}
+          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip" : "Long press to delete"}
         </ThemedText>
       </View>
     </ThemedView>
@@ -1866,7 +1853,7 @@ const styles = StyleSheet.create({
   },
   ratingButton: {
     minWidth: 110,
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 12,
     alignItems: 'center',
