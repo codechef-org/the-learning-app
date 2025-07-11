@@ -17,6 +17,13 @@ export default function AuthLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="callback"
+        options={{
+          title: 'Email Verification',
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 } 
