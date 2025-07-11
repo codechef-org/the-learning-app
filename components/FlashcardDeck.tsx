@@ -279,7 +279,32 @@ export default function FlashcardDeck() {
 
 
 
-  const deleteFlashcard = async (flashcardId: string) => {
+  const resetCardPosition = useCallback(() => {
+    // Stop any running animations first
+    stopAllAnimations();
+    
+    // Reset values instantly for immediate feedback
+    translateX.setValue(0);
+    translateY.setValue(0);
+    rotate.setValue(0);
+    scale.setValue(1);
+    flipValue.setValue(0);
+    ratingOpacity.setValue(0);
+    
+    // Reset state
+    setIsFlipped(false);
+    setPreviewRating(null);
+    setSelectedRating(null);
+    
+    // For new cards, they can see the answer immediately, so set hasSeenAnswer to true
+    if (flashcards.length > 0 && currentIndex < flashcards.length) {
+      setHasSeenAnswer(isNewCard(flashcards[currentIndex]));
+    } else {
+      setHasSeenAnswer(false);
+    }
+  }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations, flashcards, currentIndex, isNewCard]);
+
+  const deleteFlashcard = useCallback(async (flashcardId: string) => {
     if (!user) {
       return;
     }
@@ -315,7 +340,7 @@ export default function FlashcardDeck() {
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [user, setIsDeleting, setFlashcards, setIsFlipped, resetCardPosition]);
 
   const handleLongPress = useCallback(() => {
     if (isDeleting || currentIndex >= flashcards.length) {
@@ -523,31 +548,6 @@ export default function FlashcardDeck() {
       setHasSeenAnswer(true);
     }
   }, [isFlipped, flipValue, addAnimation, flashcards, currentIndex, isNewCard]);
-
-  const resetCardPosition = useCallback(() => {
-    // Stop any running animations first
-    stopAllAnimations();
-    
-    // Reset values instantly for immediate feedback
-    translateX.setValue(0);
-    translateY.setValue(0);
-    rotate.setValue(0);
-    scale.setValue(1);
-    flipValue.setValue(0);
-    ratingOpacity.setValue(0);
-    
-    // Reset state
-    setIsFlipped(false);
-    setPreviewRating(null);
-    setSelectedRating(null);
-    
-    // For new cards, they can see the answer immediately, so set hasSeenAnswer to true
-    if (flashcards.length > 0 && currentIndex < flashcards.length) {
-      setHasSeenAnswer(isNewCard(flashcards[currentIndex]));
-    } else {
-      setHasSeenAnswer(false);
-    }
-  }, [translateX, translateY, rotate, scale, flipValue, ratingOpacity, stopAllAnimations, flashcards, currentIndex, isNewCard]);
 
   const nextCard = useCallback((rating?: number) => {
     // Clear rating state immediately before starting transition
