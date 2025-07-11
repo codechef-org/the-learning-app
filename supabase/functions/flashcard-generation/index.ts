@@ -537,6 +537,7 @@ async function generateFlashcardsWithAI(chat: any, messages: ChatMessage[]): Pro
 4.  **Decompose and Create:** After identifying a source-grounded concept, decompose it into its smallest logical, testable component and create a flashcard in the most appropriate format.
 5.  **Generate Topic Tags:** Create relevant tags based on the subject matter of the flashcard.
 6.  **AVOID:** Creating overly broad questions like "Summarize X" or "Explain everything about Y."
+7.  **AVOID:** Creating flashcards from chats where only the syllabus is discussed.
 
 **Flashcard Types:**
 *   **"qa":** For a standard Question/Answer. Ideal for cause-and-effect, "why," or "how" questions.
