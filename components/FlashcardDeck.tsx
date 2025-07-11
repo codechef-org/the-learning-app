@@ -219,6 +219,12 @@ export default function FlashcardDeck() {
     if (!isWeb || typeof window === 'undefined') return;
 
     const handleKeyPress = (event: KeyboardEvent) => {
+      // Don't trigger if an input or textarea is focused
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) {
+        return;
+      }
+
       if (currentIndex >= flashcards.length || isReviewing) return;
 
       const currentCard = flashcards[currentIndex];
@@ -259,10 +265,8 @@ export default function FlashcardDeck() {
           break;
         case 'Delete':
         case 'Backspace':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            if (typeof handleLongPress === 'function') handleLongPress();
-          }
+          event.preventDefault();
+          if (typeof handleLongPress === 'function') handleLongPress();
           break;
       }
     };
@@ -276,7 +280,9 @@ export default function FlashcardDeck() {
 
 
   const deleteFlashcard = async (flashcardId: string) => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
 
     try {
       setIsDeleting(true);
@@ -287,7 +293,10 @@ export default function FlashcardDeck() {
         .eq('id', flashcardId)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       // Remove the deleted flashcard from the local state
       setFlashcards(prev => prev.filter(card => card.id !== flashcardId));
@@ -295,9 +304,6 @@ export default function FlashcardDeck() {
       // If we deleted the current card, reset the flip state
       setIsFlipped(false);
       resetCardPosition();
-      
-      // If this was the last card, the currentIndex will automatically be handled
-      // by the component re-render since flashcards.length will be reduced
       
     } catch (error) {
       console.error('Error deleting flashcard:', error);
@@ -312,35 +318,54 @@ export default function FlashcardDeck() {
   };
 
   const handleLongPress = useCallback(() => {
-    if (isDeleting || currentIndex >= flashcards.length) return;
+    if (isDeleting || currentIndex >= flashcards.length) {
+      return;
+    }
     
     const currentCard = flashcards[currentIndex];
     
+    if (!currentCard) {
+      return;
+    }
+    
     // Only allow deletion of real flashcards, not sample ones
     if (currentCard.id.startsWith('sample-')) {
-      Alert.alert(
-        'Cannot Delete',
-        'This is a sample flashcard and cannot be deleted.',
-        [{ text: 'OK' }]
-      );
+      if (isWeb) {
+        window.alert('This is a sample flashcard and cannot be deleted.');
+      } else {
+        Alert.alert(
+          'Cannot Delete',
+          'This is a sample flashcard and cannot be deleted.',
+          [{ text: 'OK' }]
+        );
+      }
       return;
     }
 
-    Alert.alert(
-      'Delete Flashcard',
-      'Are you sure you want to delete this flashcard? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => deleteFlashcard(currentCard.id),
-        },
-      ]
-    );
+    if (isWeb) {
+      const confirmed = window.confirm('Are you sure you want to delete this flashcard? This action cannot be undone.');
+      if (confirmed) {
+        deleteFlashcard(currentCard.id);
+      }
+    } else {
+      Alert.alert(
+        'Delete Flashcard',
+        'Are you sure you want to delete this flashcard? This action cannot be undone.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => {
+              deleteFlashcard(currentCard.id);
+            },
+          },
+        ]
+      );
+    }
   }, [isDeleting, currentIndex, flashcards, deleteFlashcard]);
 
   const onLongPressStateChange = useCallback((event: any) => {
@@ -1497,6 +1522,16 @@ export default function FlashcardDeck() {
             </View>
           )}
 
+          {/* Delete button for web */}
+          <View style={styles.deleteButtonContainer}>
+            <TouchableWithoutFeedback onPress={() => {
+              handleLongPress();
+            }}>
+              <View style={[styles.deleteButton, { borderColor: '#ef4444' }]}>
+                <ThemedText style={[styles.deleteButtonText, { color: '#ef4444' }]}>🗑️ Delete Card</ThemedText>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
 
         </View>
       )}
@@ -1518,7 +1553,7 @@ export default function FlashcardDeck() {
           )}
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.5 }]}>
-          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip" : "Long press to delete"}
+          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip • Delete to delete" : "Long press to delete"}
         </ThemedText>
       </View>
     </ThemedView>
@@ -1955,5 +1990,15 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontWeight: '600',
     fontSize: 14,
+  },
+  deleteButtonContainer: {
+    marginTop: 16,
+    width: '100%',
+    alignItems: 'center',
+  },
+  deleteButtonSubtext: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
   },
 });
