@@ -1,6 +1,7 @@
 import ChatHistory from '@/components/ChatHistory';
 import ChatScreen from '@/components/ChatScreen';
 import LearningMethodsList from '@/components/LearningMethodsList';
+import NotificationSettings from '@/components/NotificationSettings';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -224,6 +225,7 @@ export default function LearnScreen() {
           </ThemedView>
           
           <ChatHistory onChatSelect={handleChatSelect} />
+          <NotificationSettings />
         </ScrollView>
       </ThemedView>
     );
