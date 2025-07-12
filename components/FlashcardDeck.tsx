@@ -788,10 +788,10 @@ export default function FlashcardDeck() {
 
   const getRatingLabel = (rating: number): string => {
     switch (rating) {
-      case 1: return 'Again';
-      case 2: return 'Hard';
-      case 3: return 'Good'; 
-      case 4: return 'Easy';
+      case 1: return 'Forgot';
+      case 2: return 'Challenging';
+      case 3: return 'Got it!'; 
+      case 4: return 'Too Easy';
       default: return '';
     }
   };
@@ -1464,7 +1464,7 @@ export default function FlashcardDeck() {
                     isReviewing && styles.buttonDisabled
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>1</ThemedText>
-                    <ThemedText style={styles.ratingButtonLabel}>Again</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Forgot</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1477,7 +1477,7 @@ export default function FlashcardDeck() {
                     isReviewing && styles.buttonDisabled
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>2</ThemedText>
-                    <ThemedText style={styles.ratingButtonLabel}>Hard</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Challenging</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1490,7 +1490,7 @@ export default function FlashcardDeck() {
                     isReviewing && styles.buttonDisabled
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>3</ThemedText>
-                    <ThemedText style={styles.ratingButtonLabel}>Good</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Got it!</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
                 <TouchableWithoutFeedback
@@ -1503,7 +1503,7 @@ export default function FlashcardDeck() {
                     isReviewing && styles.buttonDisabled
                   ]}>
                     <ThemedText style={styles.ratingButtonNumber}>4</ThemedText>
-                    <ThemedText style={styles.ratingButtonLabel}>Easy</ThemedText>
+                    <ThemedText style={styles.ratingButtonLabel}>Too Easy</ThemedText>
                   </View>
                 </TouchableWithoutFeedback>
               </View>
@@ -1548,12 +1548,12 @@ export default function FlashcardDeck() {
           ) : (
             // Mobile instructions
             isNewCard(currentCard) 
-              ? "New card - both sides shown • Swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
-              : "Tap to flip • Then swipe: ← Again • ↓ Hard • → Good • ↑ Easy"
+              ? "New card - both sides shown • Swipe: ← Forgot • ↓ Challenging • → Got it! • ↑ Too Easy"
+              : "Tap to flip • Then swipe: ← Forgot • ↓ Challenging • → Got it! • ↑ Too Easy"
           )}
         </ThemedText>
         <ThemedText style={[styles.instructionSubtext, { color: textColor, opacity: 0.5 }]}>
-          {isWeb ? "⌨️ Keyboard shortcuts: 1-4 to rate • Space/Enter to flip • Delete to delete" : "Long press to delete"}
+          {isWeb ? "⌨️ Keyboard shortcuts: 1=Forgot, 2=Challenging, 3=Got it!, 4=Too Easy • Space/Enter to flip • Delete to delete" : "Long press to delete"}
         </ThemedText>
       </View>
     </ThemedView>
