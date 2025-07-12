@@ -33,6 +33,8 @@ import {
 } from 'react-native-gesture-handler';
 import { ThemedText } from './ThemedText';
 import { ThemedView } from './ThemedView';
+import OnboardingOverlay from './ui/OnboardingOverlay';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -107,6 +109,9 @@ export default function FlashcardDeck() {
   const [selectedRating, setSelectedRating] = useState<number | null>(null);
   const [previewRating, setPreviewRating] = useState<number | null>(null);
   const [hasSeenAnswer, setHasSeenAnswer] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  const ONBOARDING_KEY = 'hasSeenFlashcardOnboarding';
   
   // Theme colors
   const backgroundColor = useThemeColor({}, 'background');
@@ -213,6 +218,22 @@ export default function FlashcardDeck() {
       setHasSeenAnswer(isNewCard(currentCard));
     }
   }, [currentIndex, flashcards, isNewCard]);
+
+  // Onboarding logic
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (value === null) {
+          // If value is null, it means user hasn't seen onboarding yet
+          setShowOnboarding(true);
+        }
+      } catch (error) {
+        console.error('Error reading onboarding status from AsyncStorage:', error);
+      }
+    };
+    checkOnboardingStatus();
+  }, [ONBOARDING_KEY]);
 
   // Keyboard shortcuts for web - must be at top level with other hooks
   useEffect(() => {
@@ -1049,6 +1070,15 @@ export default function FlashcardDeck() {
     );
   };
 
+  const handleOnboardingClose = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      setShowOnboarding(false);
+    } catch (error) {
+      console.error('Error saving onboarding status to AsyncStorage:', error);
+    }
+  }, []);
+
   if (loading) {
     return (
       <ThemedView style={styles.loadingContainer}>
@@ -1556,6 +1586,13 @@ export default function FlashcardDeck() {
           {isWeb ? "⌨️ Keyboard shortcuts: 1=Forgot, 2=Challenging, 3=Got it!, 4=Too Easy • Space/Enter to flip • Delete to delete" : "Long press to delete"}
         </ThemedText>
       </View>
+
+      {!isWeb && (
+        <OnboardingOverlay
+          isVisible={showOnboarding}
+          onClose={handleOnboardingClose}
+        />
+      )}
     </ThemedView>
   );
 }
