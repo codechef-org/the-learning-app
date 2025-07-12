@@ -16,6 +16,10 @@ Notifications.setNotificationHandler({
 const DAILY_NOTIFICATION_ID = 'daily-revision-reminder';
 
 export default function NotificationSettings() {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
   const [areNotificationsEnabled, setAreNotificationsEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState(new Date());
   const [isTimePickerVisible, setTimePickerVisible] = useState(false);
